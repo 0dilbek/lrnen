@@ -1,0 +1,83 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background-color: #f8fafc;
+  color: #1e293b;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* ── Dark mode global overrides ── */
+html.dark body {
+  background-color: #0f172a;
+  color: #e2e8f0;
+}
+
+html.dark .bg-white        { background-color: #1e293b; }
+html.dark .bg-gray-50      { background-color: #0f172a; }
+html.dark .bg-gray-100     { background-color: #1e293b; }
+html.dark .bg-gray-200     { background-color: #334155; }
+
+html.dark .border-gray-100,
+html.dark .border-gray-200 { border-color: #334155; }
+
+html.dark .text-gray-900   { color: #f1f5f9; }
+html.dark .text-gray-800   { color: #e2e8f0; }
+html.dark .text-gray-700   { color: #cbd5e1; }
+html.dark .text-gray-600   { color: #94a3b8; }
+html.dark .text-gray-500   { color: #64748b; }
+html.dark .text-gray-400   { color: #475569; }
+
+html.dark .hover\:bg-gray-50:hover  { background-color: #1e293b; }
+html.dark .hover\:bg-gray-100:hover { background-color: #334155; }
+
+html.dark input:not(.light-input),
+html.dark textarea,
+html.dark select {
+  background-color: #1e293b;
+  color: #e2e8f0;
+  border-color: #334155;
+}
+
+html.dark input:not(.light-input)::placeholder,
+html.dark textarea::placeholder { color: #475569; }
+
+/* Login sahifasi har doim light bo'ladi */
+.always-light,
+.always-light input,
+.always-light select,
+.always-light textarea {
+  background-color: revert !important;
+  color: revert !important;
+  border-color: revert !important;
+}
+.always-light .bg-white        { background-color: white !important; }
+.always-light .bg-gray-50      { background-color: #f9fafb !important; }
+.always-light .text-gray-900   { color: #111827 !important; }
+.always-light .text-gray-800   { color: #1f2937 !important; }
+.always-light .text-gray-700   { color: #374151 !important; }
+.always-light .text-gray-500   { color: #6b7280 !important; }
+.always-light .text-gray-400   { color: #9ca3af !important; }
+.always-light .border-gray-200 { border-color: #e5e7eb !important; }
+
+html.dark .shadow-sm {
+  --tw-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.4);
+  box-shadow: var(--tw-shadow);
+}
+
+html.dark .shadow-2xl {
+  --tw-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.6);
+  box-shadow: var(--tw-shadow);
+}

@@ -1,0 +1,14 @@
+.env
+__pycache__/
+*.pyc
+*.pyo
+db.sqlite3
+myenv/
+media/
+node_modules/
+frontend/dist/
+frontend/.env
+pdf_images/
+tmp_pages/
+.claude/
+*.log
