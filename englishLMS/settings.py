@@ -102,7 +102,7 @@ SIMPLE_JWT = {
 }
 
 SUPER_ADMIN_USERNAME = 'admin'
-STATICFILES_DIRS = ['/home/abdusama/abdusamad.uz/django/static_files']
-STATIC_ROOT = '/home/abdusama/abdusamad.uz/django/static'
+STATICFILES_DIRS = ['/home/lrnenuz/lrnen.uz/django/static_files']
+STATIC_ROOT = '/home/lrnenuz/lrnen.uz/django/static'
 MEDIA_URL = 'media/'
-MEDIA_ROOT = '/home/abdusama/abdusamad.uz/django/media'
+MEDIA_ROOT = '/home/lrnenuz/lrnen.uz/django/media'
