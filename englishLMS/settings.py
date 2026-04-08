@@ -30,6 +30,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -100,3 +101,7 @@ SIMPLE_JWT = {
 }
 
 SUPER_ADMIN_USERNAME = 'admin'
+STATICFILES_DIRS = ['/home/abdusama/abdusamad.uz/django/static_files']
+STATIC_ROOT = '/home/abdusama/abdusamad.uz/django/static'
+MEDIA_URL = 'media/'
+MEDIA_ROOT = '/home/abdusama/abdusamad.uz/django/media'
