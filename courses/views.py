@@ -2,8 +2,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
 from django.db.models import Q
-from .models import Category, Lesson, UserProgress, Vocabulary
-from .serializers import CategorySerializer, LessonSerializer, UserProgressSerializer, VocabularySerializer
+from .models import Category, Lesson, UserProgress, Vocabulary, Level
+from .serializers import CategorySerializer, LessonSerializer, UserProgressSerializer, VocabularySerializer, LevelSerializer
 
 
 class IsAdmin(permissions.BasePermission):
@@ -63,17 +63,28 @@ class CategoryDetailView(APIView):
         return Response(status=204)
 
 
+class LevelListView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        levels = Level.objects.all()
+        return Response(LevelSerializer(levels, many=True).data)
+
+
 class LessonListView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        qs = Lesson.objects.select_related('category').all()
+        qs = Lesson.objects.select_related('category').prefetch_related('levels').all()
         search = request.query_params.get('search', '')
         category = request.query_params.get('category', '')
+        level = request.query_params.get('level', '')
         if search:
             qs = qs.filter(Q(title__icontains=search) | Q(description__icontains=search))
         if category:
             qs = qs.filter(category_id=category)
+        if level:
+            qs = qs.filter(levels__slug=level)
         return Response(LessonSerializer(qs, many=True).data)
 
     def post(self, request):

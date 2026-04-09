@@ -14,14 +14,32 @@ class Category(models.Model):
         verbose_name_plural = 'Categories'
 
 
-class Lesson(models.Model):
-    DIFFICULTY_CHOICES = [('easy', 'Easy'), ('medium', 'Medium'), ('hard', 'Hard')]
+class Level(models.Model):
+    LEVEL_CHOICES = [
+        ('a1', 'A1 Beginner'),
+        ('a2', 'A2 Elementary'),
+        ('b1', 'B1 Pre-Intermediate'),
+        ('b2', 'B2 Intermediate'),
+        ('c1', 'C1 Upper-Intermediate'),
+        ('c2', 'C2 Advanced'),
+        ('ielts', 'IELTS'),
+    ]
+    slug = models.CharField(max_length=10, choices=LEVEL_CHOICES, unique=True)
+    order = models.PositiveIntegerField(default=0)
 
+    def __str__(self):
+        return dict(self.LEVEL_CHOICES).get(self.slug, self.slug)
+
+    class Meta:
+        ordering = ['order']
+
+
+class Lesson(models.Model):
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
     video_url = models.URLField()
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, related_name='lessons')
-    difficulty = models.CharField(max_length=10, choices=DIFFICULTY_CHOICES, default='easy')
+    levels = models.ManyToManyField(Level, blank=True, related_name='lessons')
     order = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 

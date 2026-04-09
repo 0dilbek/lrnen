@@ -4,6 +4,7 @@ from . import views
 urlpatterns = [
     path('categories/', views.CategoryListView.as_view(), name='category_list'),
     path('categories/<int:pk>/', views.CategoryDetailView.as_view(), name='category_detail'),
+    path('levels/', views.LevelListView.as_view(), name='level_list'),
     path('lessons/', views.LessonListView.as_view(), name='lesson_list'),
     path('lessons/<int:pk>/', views.LessonDetailView.as_view(), name='lesson_detail'),
     path('vocabulary/', views.VocabularyListView.as_view(), name='vocabulary_list'),
