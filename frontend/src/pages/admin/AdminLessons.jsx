@@ -20,6 +20,7 @@ const EXERCISE_TYPES = [
 ───────────────────────────────────────────── */
 export default function AdminLessons() {
   const [categories, setCategories] = useState([]);
+  const [levels, setLevels] = useState([]);
   const [lessons, setLessons] = useState([]);
   const [quizzes, setQuizzes] = useState([]);
   const [exercises, setExercises] = useState([]);
@@ -31,14 +32,16 @@ export default function AdminLessons() {
   const [confirm, setConfirm] = useState(null);
 
   const load = async () => {
-    const [c, l, q, ex, v] = await Promise.all([
+    const [c, lvl, l, q, ex, v] = await Promise.all([
       api.get('/courses/categories/'),
+      api.get('/courses/levels/'),
       api.get('/courses/lessons/'),
       api.get('/quiz/'),
       api.get('/quiz/exercises/'),
       api.get('/courses/vocabulary/'),
     ]);
     setCategories(c.data);
+    setLevels(lvl.data);
     setLessons(l.data);
     setQuizzes(q.data);
     setExercises(ex.data);
@@ -409,6 +412,7 @@ export default function AdminLessons() {
         <LessonModal
           data={modal.data}
           categories={categories}
+          levels={levels}
           onClose={closeModal}
           onSave={async () => { closeModal(); await load(); }}
         />
@@ -512,20 +516,27 @@ function ModalWrapper({ title, subtitle, onClose, children }) {
 /* ─────────────────────────────────────────────
    Lesson modal
 ───────────────────────────────────────────── */
-function LessonModal({ data, categories, onClose, onSave }) {
+function LessonModal({ data, categories, levels, onClose, onSave }) {
   const isEdit = !!data?.id;
   const [form, setForm] = useState({
     title: data?.title ?? '',
     description: data?.description ?? '',
     video_url: data?.video_url ?? '',
     category: data?.category ?? '',
-    difficulty: data?.difficulty ?? 'easy',
     order: data?.order ?? 0,
   });
+  const [selectedLevelIds, setSelectedLevelIds] = useState(
+    data?.levels?.map((l) => l.id) ?? []
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const toggleLevel = (id) =>
+    setSelectedLevelIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
 
   const handleSave = async () => {
     if (!form.title.trim()) return setError('Dars nomi majburiy');
@@ -533,10 +544,11 @@ function LessonModal({ data, categories, onClose, onSave }) {
     setError('');
     setSaving(true);
     try {
+      const payload = { ...form, level_ids: selectedLevelIds };
       if (isEdit) {
-        await api.put(`/courses/lessons/${data.id}/`, form);
+        await api.put(`/courses/lessons/${data.id}/`, payload);
       } else {
-        await api.post('/courses/lessons/', form);
+        await api.post('/courses/lessons/', payload);
       }
       onSave();
     } catch {
@@ -563,16 +575,27 @@ function LessonModal({ data, categories, onClose, onSave }) {
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Qiyinlik darajasi</label>
-          <select
-            value={form.difficulty}
-            onChange={(e) => set('difficulty', e.target.value)}
-            className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-          >
-            <option value="easy">⭐ Oson</option>
-            <option value="medium">⭐⭐ O'rta</option>
-            <option value="hard">⭐⭐⭐ Qiyin</option>
-          </select>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Daraja (bir nechta tanlash mumkin)</label>
+          <div className="flex flex-wrap gap-2">
+            {levels.map((lvl) => {
+              const active = selectedLevelIds.includes(lvl.id);
+              return (
+                <button
+                  key={lvl.id}
+                  type="button"
+                  onClick={() => toggleLevel(lvl.id)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition ${
+                    active
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'bg-white text-gray-600 border-gray-200 hover:border-blue-400'
+                  }`}
+                >
+                  {active && <Check size={10} className="inline mr-1" />}
+                  {lvl.name}
+                </button>
+              );
+            })}
+          </div>
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Tavsif</label>

@@ -25,9 +25,11 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const { xp, streak, badges } = useGame();
   const [categories, setCategories] = useState([]);
+  const [levels, setLevels] = useState([]);
   const [lessons, setLessons] = useState([]);
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedLevel, setSelectedLevel] = useState('');
   const [progress, setProgress] = useState({});
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
@@ -35,10 +37,12 @@ export default function DashboardPage() {
   useEffect(() => {
     Promise.all([
       api.get('/courses/categories/'),
+      api.get('/courses/levels/'),
       api.get('/courses/lessons/'),
       api.get('/courses/progress/'),
-    ]).then(([cats, lsns, prog]) => {
+    ]).then(([cats, lvls, lsns, prog]) => {
       setCategories(cats.data);
+      setLevels(lvls.data);
       setLessons(lsns.data);
       const progressMap = {};
       prog.data.forEach((p) => { progressMap[p.lesson] = p; });
@@ -46,15 +50,13 @@ export default function DashboardPage() {
     }).finally(() => setLoading(false));
   }, []);
 
-  const [selectedDifficulty, setSelectedDifficulty] = useState('');
-
   const filtered = lessons.filter((l) => {
     const matchSearch =
       l.title.toLowerCase().includes(search.toLowerCase()) ||
       l.description.toLowerCase().includes(search.toLowerCase());
     const matchCat = !selectedCategory || l.category === Number(selectedCategory);
-    const matchDiff = !selectedDifficulty || l.difficulty === selectedDifficulty;
-    return matchSearch && matchCat && matchDiff;
+    const matchLevel = !selectedLevel || l.levels?.some((lv) => lv.slug === selectedLevel);
+    return matchSearch && matchCat && matchLevel;
   });
 
   const completedCount = Object.values(progress).filter((p) => p.status === 'completed').length;
@@ -175,27 +177,34 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Difficulty filter */}
-      <div className="flex gap-2 flex-wrap mb-6">
-        {[
-          { val: '',       label: 'Barcha daraja' },
-          { val: 'easy',   label: '⭐ Oson'       },
-          { val: 'medium', label: '⭐⭐ O\'rta'    },
-          { val: 'hard',   label: '⭐⭐⭐ Qiyin'   },
-        ].map(({ val, label }) => (
+      {/* Level filter */}
+      {levels.length > 0 && (
+        <div className="flex gap-2 flex-wrap mb-6">
           <button
-            key={val}
-            onClick={() => setSelectedDifficulty(val)}
+            onClick={() => setSelectedLevel('')}
             className={`px-3 py-1 rounded-full text-xs font-semibold transition-all border ${
-              selectedDifficulty === val
+              !selectedLevel
                 ? 'bg-gray-900 text-white border-gray-900'
                 : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'
             }`}
           >
-            {label}
+            Barcha daraja
           </button>
-        ))}
-      </div>
+          {levels.map((lvl) => (
+            <button
+              key={lvl.slug}
+              onClick={() => setSelectedLevel(selectedLevel === lvl.slug ? '' : lvl.slug)}
+              className={`px-3 py-1 rounded-full text-xs font-semibold transition-all border ${
+                selectedLevel === lvl.slug
+                  ? 'bg-gray-900 text-white border-gray-900'
+                  : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'
+              }`}
+            >
+              {lvl.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Lessons Grid */}
       {filtered.length === 0 ? (
@@ -250,20 +259,16 @@ function LessonCard({ lesson, progress, onClick }) {
       </div>
 
       <div className="p-4">
-        {/* Category + difficulty badges */}
+        {/* Category + level badges */}
         <div className="flex items-center gap-1.5 flex-wrap mb-2">
           <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${theme.pill}`}>
             {lesson.category_name || 'Umumiy'}
           </span>
-          {lesson.difficulty && (
-            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-              lesson.difficulty === 'easy'   ? 'bg-green-100 text-green-700' :
-              lesson.difficulty === 'medium' ? 'bg-yellow-100 text-yellow-700' :
-                                              'bg-red-100 text-red-700'
-            }`}>
-              {lesson.difficulty === 'easy' ? '⭐' : lesson.difficulty === 'medium' ? '⭐⭐' : '⭐⭐⭐'}
+          {lesson.levels?.map((lv) => (
+            <span key={lv.slug} className="text-xs font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
+              {lv.name}
             </span>
-          )}
+          ))}
         </div>
 
         {/* Title */}
