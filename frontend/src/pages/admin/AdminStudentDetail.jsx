@@ -3,8 +3,18 @@ import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../api';
 import {
   ArrowLeft, Loader2, CheckCircle, Clock, User,
-  KeyRound, Trash2, Eye, EyeOff, X,
+  KeyRound, Trash2, Eye, EyeOff, X, BookOpen,
 } from 'lucide-react';
+
+const LEVEL_COLORS = {
+  a1: 'bg-green-100 text-green-700 border-green-300',
+  a2: 'bg-emerald-100 text-emerald-700 border-emerald-300',
+  b1: 'bg-blue-100 text-blue-700 border-blue-300',
+  b2: 'bg-indigo-100 text-indigo-700 border-indigo-300',
+  c1: 'bg-purple-100 text-purple-700 border-purple-300',
+  c2: 'bg-fuchsia-100 text-fuchsia-700 border-fuchsia-300',
+  ielts: 'bg-orange-100 text-orange-700 border-orange-300',
+};
 
 function ChangePasswordModal({ student, onClose }) {
   const [password, setPassword] = useState('');
@@ -63,16 +73,102 @@ function ChangePasswordModal({ student, onClose }) {
   );
 }
 
+// ── Level tahrirlash modal ─────────────────────────────────────────────────────
+function EditLevelsModal({ student, allLevels, onClose, onSaved }) {
+  const [selected, setSelected] = useState(student.levels.map((l) => l.id));
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const toggle = (id) => {
+    setSelected((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  const handleSave = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      await api.patch(`/auth/students/${student.id}/`, { level_ids: selected });
+      onSaved(selected);
+      onClose();
+    } catch {
+      setError('Xatolik yuz berdi');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold text-gray-900">Daraja (level) biriktirish</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition"><X size={20} /></button>
+        </div>
+        <p className="text-sm text-gray-500 mb-4">
+          <span className="font-medium text-gray-700">{student.full_name || student.username}</span> uchun daraja tanlang
+        </p>
+
+        {error && <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-2 mb-4 text-sm">{error}</div>}
+
+        <div className="flex flex-wrap gap-2 mb-6">
+          {allLevels.map((lvl) => {
+            const active = selected.includes(lvl.id);
+            const cls = LEVEL_COLORS[lvl.slug] || 'bg-gray-100 text-gray-700 border-gray-300';
+            return (
+              <button
+                key={lvl.id}
+                type="button"
+                onClick={() => toggle(lvl.id)}
+                className={`px-3 py-2 rounded-xl text-sm font-semibold border-2 transition-all ${
+                  active
+                    ? `${cls} scale-105 shadow-sm`
+                    : 'bg-white text-gray-400 border-gray-200 hover:border-gray-400'
+                }`}
+              >
+                {lvl.name}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="flex gap-3">
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-semibold hover:bg-gray-50 transition">
+            Bekor
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={loading}
+            className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-sm font-semibold transition flex items-center justify-center gap-2"
+          >
+            {loading ? <Loader2 className="animate-spin" size={16} /> : null}
+            Saqlash
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminStudentDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [data, setData] = useState(null);
+  const [allLevels, setAllLevels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showChangePass, setShowChangePass] = useState(false);
+  const [showEditLevels, setShowEditLevels] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    api.get(`/auth/students/${id}/`).then(({ data }) => setData(data)).finally(() => setLoading(false));
+    Promise.all([
+      api.get(`/auth/students/${id}/`),
+      api.get('/courses/levels/'),
+    ]).then(([studentRes, levelsRes]) => {
+      setData(studentRes.data);
+      setAllLevels(levelsRes.data);
+    }).finally(() => setLoading(false));
   }, [id]);
 
   const handleDelete = async () => {
@@ -85,6 +181,12 @@ export default function AdminStudentDetail() {
       alert("O'chirishda xatolik");
       setDeleting(false);
     }
+  };
+
+  // Level saqlangandan so'ng local state yangilash
+  const handleLevelsSaved = (selectedIds) => {
+    const updatedLevels = allLevels.filter((l) => selectedIds.includes(l.id));
+    setData((prev) => ({ ...prev, user: { ...prev.user, levels: updatedLevels } }));
   };
 
   if (loading) {
@@ -101,6 +203,14 @@ export default function AdminStudentDetail() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       {showChangePass && <ChangePasswordModal student={user} onClose={() => setShowChangePass(false)} />}
+      {showEditLevels && (
+        <EditLevelsModal
+          student={user}
+          allLevels={allLevels}
+          onClose={() => setShowEditLevels(false)}
+          onSaved={handleLevelsSaved}
+        />
+      )}
 
       <button onClick={() => navigate('/admin/students')}
         className="flex items-center gap-2 text-gray-500 hover:text-blue-600 transition mb-6">
@@ -136,7 +246,41 @@ export default function AdminStudentDetail() {
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-gray-100">
+        {/* Darajalar */}
+        <div className="mt-5 pt-5 border-t border-gray-100">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
+              <BookOpen size={14} /> Darajalar
+            </p>
+            <button
+              onClick={() => setShowEditLevels(true)}
+              className="text-xs text-blue-600 hover:text-blue-800 font-semibold transition"
+            >
+              Tahrirlash
+            </button>
+          </div>
+          {user.levels?.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {user.levels.map((lvl) => {
+                const cls = LEVEL_COLORS[lvl.slug] || 'bg-gray-100 text-gray-700 border-gray-300';
+                return (
+                  <span key={lvl.slug} className={`text-xs font-semibold px-3 py-1 rounded-full border ${cls}`}>
+                    {lvl.name}
+                  </span>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400 italic">
+              Daraja biriktirilmagan —{' '}
+              <button onClick={() => setShowEditLevels(true)} className="text-blue-500 hover:underline">
+                biriktirish
+              </button>
+            </p>
+          )}
+        </div>
+
+        <div className="grid grid-cols-3 gap-4 mt-5 pt-5 border-t border-gray-100">
           <div className="text-center">
             <p className="text-2xl font-bold text-gray-900">{progress.length}</p>
             <p className="text-xs text-gray-500 mt-0.5">Boshlangan</p>

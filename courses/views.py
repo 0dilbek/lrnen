@@ -79,6 +79,12 @@ class LessonListView(APIView):
         search = request.query_params.get('search', '')
         category = request.query_params.get('category', '')
         level = request.query_params.get('level', '')
+
+        # Student o'ziga biriktirilgan levellar bo'yicha avtomatik filter
+        if request.user.role == 'student' and request.user.levels.exists():
+            user_level_slugs = list(request.user.levels.values_list('slug', flat=True))
+            qs = qs.filter(levels__slug__in=user_level_slugs).distinct()
+
         if search:
             qs = qs.filter(Q(title__icontains=search) | Q(description__icontains=search))
         if category:
