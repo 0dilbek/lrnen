@@ -6,12 +6,71 @@ import {
   X, Eye, EyeOff, Trash2, KeyRound,
 } from 'lucide-react';
 
+const LEVEL_COLORS = {
+  a1: 'bg-green-100 text-green-700',
+  a2: 'bg-emerald-100 text-emerald-700',
+  b1: 'bg-blue-100 text-blue-700',
+  b2: 'bg-indigo-100 text-indigo-700',
+  c1: 'bg-purple-100 text-purple-700',
+  c2: 'bg-fuchsia-100 text-fuchsia-700',
+  ielts: 'bg-orange-100 text-orange-700',
+};
+
+function LevelBadge({ level }) {
+  const cls = LEVEL_COLORS[level.slug] || 'bg-gray-100 text-gray-700';
+  return (
+    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${cls}`}>
+      {level.name}
+    </span>
+  );
+}
+
+// ── Level multi-select component ──────────────────────────────────────────────
+function LevelSelect({ levels, selected, onChange }) {
+  const toggle = (id) => {
+    if (selected.includes(id)) {
+      onChange(selected.filter((x) => x !== id));
+    } else {
+      onChange([...selected, id]);
+    }
+  };
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {levels.map((lvl) => {
+        const active = selected.includes(lvl.id);
+        const cls = LEVEL_COLORS[lvl.slug] || 'bg-gray-100 text-gray-700';
+        return (
+          <button
+            key={lvl.id}
+            type="button"
+            onClick={() => toggle(lvl.id)}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold border-2 transition-all ${
+              active
+                ? `${cls} border-current scale-105 shadow-sm`
+                : 'bg-white text-gray-400 border-gray-200 hover:border-gray-400'
+            }`}
+          >
+            {lvl.name}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── Modal: O'quvchi qo'shish ──────────────────────────────────────────────────
 function AddStudentModal({ onClose, onCreated }) {
   const [form, setForm] = useState({ full_name: '', username: '', password: '' });
+  const [selectedLevels, setSelectedLevels] = useState([]);
+  const [levels, setLevels] = useState([]);
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    api.get('/courses/levels/').then(({ data }) => setLevels(data));
+  }, []);
 
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
 
@@ -24,7 +83,10 @@ function AddStudentModal({ onClose, onCreated }) {
     setLoading(true);
     setError('');
     try {
-      const { data } = await api.post('/auth/students/', form);
+      const { data } = await api.post('/auth/students/', {
+        ...form,
+        level_ids: selectedLevels,
+      });
       onCreated(data);
       onClose();
     } catch (err) {
@@ -42,7 +104,7 @@ function AddStudentModal({ onClose, onCreated }) {
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-lg font-bold text-gray-900">Yangi o'quvchi qo'shish</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition">
@@ -131,6 +193,28 @@ function AddStudentModal({ onClose, onCreated }) {
               </div>
             )}
           </div>
+
+          {/* Level tanlov */}
+          {levels.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Daraja (level)
+                {selectedLevels.length > 0 && (
+                  <span className="ml-2 text-xs text-blue-600 font-normal">
+                    {selectedLevels.length} ta tanlandi
+                  </span>
+                )}
+              </label>
+              <LevelSelect
+                levels={levels}
+                selected={selectedLevels}
+                onChange={setSelectedLevels}
+              />
+              <p className="text-xs text-gray-400 mt-2">
+                Tanlangan levellar bo'yicha darslar ko'rsatiladi
+              </p>
+            </div>
+          )}
 
           <button
             type="submit"
@@ -330,7 +414,16 @@ export default function AdminStudents() {
                   onClick={() => navigate(`/admin/students/${student.id}`)}
                 >
                   <p className="font-medium text-gray-900">{student.full_name || '—'}</p>
-                  <p className="text-sm text-gray-500">@{student.username}</p>
+                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                    <p className="text-sm text-gray-500">@{student.username}</p>
+                    {student.levels?.length > 0 && (
+                      <div className="flex gap-1 flex-wrap">
+                        {student.levels.map((lvl) => (
+                          <LevelBadge key={lvl.slug} level={lvl} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <p className="text-xs text-gray-400 hidden sm:block shrink-0">

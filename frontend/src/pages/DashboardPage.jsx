@@ -42,7 +42,12 @@ export default function DashboardPage() {
       api.get('/courses/progress/'),
     ]).then(([cats, lvls, lsns, prog]) => {
       setCategories(cats.data);
-      setLevels(lvls.data);
+      // Student o'ziga biriktirilgan levellar bo'lsa, faqat shularni ko'rsat
+      const assignedSlugs = new Set((user?.levels || []).map((l) => l.slug));
+      const filteredLevels = assignedSlugs.size > 0
+        ? lvls.data.filter((l) => assignedSlugs.has(l.slug))
+        : lvls.data;
+      setLevels(filteredLevels);
       setLessons(lsns.data);
       const progressMap = {};
       prog.data.forEach((p) => { progressMap[p.lesson] = p; });

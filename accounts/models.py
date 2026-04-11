@@ -31,6 +31,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_staff = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    levels = models.ManyToManyField('courses.Level', blank=True, related_name='students')
+
     objects = UserManager()
 
     USERNAME_FIELD = 'username'
