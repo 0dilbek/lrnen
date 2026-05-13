@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, RotateCcw, CheckCircle, XCircle, ArrowRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, RotateCcw, CheckCircle, XCircle, ArrowRight, Volume2 } from 'lucide-react';
 
 const STAGE_INFO = [
   { label: '1. Tanishish', emoji: '👀', color: 'from-violet-500 to-purple-600' },
@@ -7,6 +7,15 @@ const STAGE_INFO = [
   { label: '3. UZ → EN',   emoji: '🇬🇧', color: 'from-emerald-500 to-teal-500' },
   { label: '4. Yozish',    emoji: '✍️',  color: 'from-orange-400 to-rose-500'  },
 ];
+
+const speak = (text) => {
+  if (!window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = 'en-US';
+  utterance.rate = 0.9;
+  window.speechSynthesis.speak(utterance);
+};
 
 export default function VocabStudy({ words }) {
   const [stage, setStage] = useState(0);
@@ -64,6 +73,11 @@ function Flashcards({ words, onComplete }) {
   const next = () => { if (isLast) { onComplete(); return; } setIdx(i => i + 1); setFlipped(false); };
   const prev = () => { setIdx(i => Math.max(0, i - 1)); setFlipped(false); };
 
+  const handleSpeak = (e) => {
+    e.stopPropagation();
+    speak(word.word);
+  };
+
   return (
     <div>
       <p className="text-sm text-gray-400 mb-4 font-medium">
@@ -86,7 +100,16 @@ function Flashcards({ words, onComplete }) {
         <div className="flip-inner w-full h-full relative">
           {/* Front */}
           <div className={`flip-front absolute inset-0 bg-gradient-to-br ${grad} rounded-2xl shadow-lg flex flex-col items-center justify-center p-8`}>
-            <p className="text-4xl font-extrabold text-white mb-2 tracking-wide">{word.word}</p>
+            <div className="flex items-center gap-3">
+              <p className="text-4xl font-extrabold text-white mb-2 tracking-wide">{word.word}</p>
+              <button 
+                onClick={handleSpeak}
+                className="p-2 rounded-full bg-white/20 hover:bg-white/40 text-white transition-all scale-110"
+                title="O'qish"
+              >
+                <Volume2 size={24} />
+              </button>
+            </div>
             {word.example && (
               <p className="text-sm text-white/70 italic text-center mt-2">"{word.example}"</p>
             )}
@@ -95,7 +118,15 @@ function Flashcards({ words, onComplete }) {
           {/* Back */}
           <div className="flip-back absolute inset-0 bg-white border-2 border-gray-100 rounded-2xl shadow-lg flex flex-col items-center justify-center p-8">
             <p className="text-3xl font-extrabold text-gray-900 mb-1">{word.translation}</p>
-            <p className={`text-lg font-semibold bg-gradient-to-r ${grad} bg-clip-text text-transparent mt-1`}>{word.word}</p>
+            <div className="flex items-center gap-2 mt-1">
+              <p className={`text-lg font-semibold bg-gradient-to-r ${grad} bg-clip-text text-transparent`}>{word.word}</p>
+              <button 
+                onClick={handleSpeak}
+                className="p-1 rounded-full text-gray-300 hover:text-blue-500 transition-colors"
+              >
+                <Volume2 size={16} />
+              </button>
+            </div>
             {word.example && (
               <p className="text-xs text-gray-400 italic text-center mt-3">"{word.example}"</p>
             )}
@@ -156,6 +187,10 @@ function MCQQuiz({ words, mode, onComplete }) {
     if (isAnswered) return;
     setSelected(opt);
     setResults(r => [...r, opt === correct]);
+    // MCQ'da inglizcha so'zni avtomatik o'qish (faqat EN->UZ rejimida)
+    if (mode === 'en_to_uz') {
+      speak(word.word);
+    }
   };
 
   const handleNext = () => {
@@ -168,8 +203,18 @@ function MCQQuiz({ words, mode, onComplete }) {
       <p className="text-sm font-semibold text-gray-600 mb-5">{title}</p>
 
       {/* Question card */}
-      <div className="bg-gradient-to-br from-blue-50 to-violet-50 border border-blue-100 rounded-2xl p-6 mb-5 text-center">
-        <p className="text-3xl font-extrabold text-gray-900">{question}</p>
+      <div className="bg-gradient-to-br from-blue-50 to-violet-50 border border-blue-100 rounded-2xl p-6 mb-5 text-center relative group">
+        <div className="flex items-center justify-center gap-3">
+          <p className="text-3xl font-extrabold text-gray-900">{question}</p>
+          {mode === 'en_to_uz' && (
+            <button 
+              onClick={() => speak(word.word)}
+              className="p-2 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors"
+            >
+              <Volume2 size={20} />
+            </button>
+          )}
+        </div>
         {mode === 'en_to_uz' && word.example && (
           <p className="text-xs text-gray-400 italic mt-2">"{word.example}"</p>
         )}
@@ -192,6 +237,9 @@ function MCQQuiz({ words, mode, onComplete }) {
               {isAnswered && isCorrect && <CheckCircle size={14} className="text-green-600 shrink-0" />}
               {isAnswered && isChosen && !isCorrect && <XCircle size={14} className="text-red-500 shrink-0" />}
               {opt}
+              {isAnswered && isCorrect && mode === 'uz_to_en' && (
+                <Volume2 size={12} className="ml-auto text-green-600" />
+              )}
             </button>
           );
         })}
@@ -226,7 +274,12 @@ function TypingQuiz({ words, onComplete }) {
   const isCorrect  = normalize(input) === normalize(word.word);
   const score      = results.filter(Boolean).length;
 
-  const handleCheck = () => { setChecked(true); setResults(r => [...r, isCorrect]); };
+  const handleCheck = () => { 
+    setChecked(true); 
+    setResults(r => [...r, isCorrect]);
+    // To'g'ri yozilsa yoki tekshirilganda inglizcha talaffuzni eshittirish
+    speak(word.word);
+  };
   const handleNext  = () => {
     if (isLast) { onComplete(); return; }
     setIdx(i => i + 1); setInput(''); setChecked(false);
@@ -244,22 +297,32 @@ function TypingQuiz({ words, onComplete }) {
 
       {/* Input */}
       <div className="mb-4">
-        <input
-          type="text"
-          value={input}
-          onChange={e => !checked && setInput(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && !checked && input.trim() && handleCheck()}
-          disabled={checked}
-          placeholder="Inglizcha so'zni yozing..."
-          autoFocus
-          className={`w-full px-4 py-3.5 border-2 rounded-xl text-base font-semibold focus:outline-none transition-all ${
-            checked
-              ? isCorrect
-                ? 'border-green-400 bg-green-50 text-green-800'
-                : 'border-red-400 bg-red-50 text-red-700'
-              : 'border-gray-200 focus:border-violet-400 focus:ring-2 focus:ring-violet-100'
-          }`}
-        />
+        <div className="relative">
+          <input
+            type="text"
+            value={input}
+            onChange={e => !checked && setInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && !checked && input.trim() && handleCheck()}
+            disabled={checked}
+            placeholder="Inglizcha so'zni yozing..."
+            autoFocus
+            className={`w-full px-4 py-3.5 border-2 rounded-xl text-base font-semibold focus:outline-none transition-all ${
+              checked
+                ? isCorrect
+                  ? 'border-green-400 bg-green-50 text-green-800'
+                  : 'border-red-400 bg-red-50 text-red-700'
+                : 'border-gray-200 focus:border-violet-400 focus:ring-2 focus:ring-violet-100'
+            }`}
+          />
+          {checked && (
+            <button 
+              onClick={() => speak(word.word)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-gray-400 hover:text-blue-500"
+            >
+              <Volume2 size={20} />
+            </button>
+          )}
+        </div>
         {checked && !isCorrect && (
           <p className="mt-2 text-sm text-green-700 font-semibold bg-green-50 px-3 py-1.5 rounded-lg">
             ✅ To'g'ri javob: <span className="font-extrabold">{word.word}</span>

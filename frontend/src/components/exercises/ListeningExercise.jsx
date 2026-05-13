@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Play, Pause, RotateCcw, Volume2 } from 'lucide-react';
+import { Play, Pause, RotateCcw, Volume2, Maximize2, X, ZoomIn, ZoomOut } from 'lucide-react';
 
 /**
  * Listening exercise
@@ -19,6 +19,11 @@ export default function ListeningExercise({ exercise, onComplete }) {
   const [playing, setPlaying] = useState(false);
   const [answers, setAnswers] = useState({});
   const [submitted, setSubmitted] = useState(false);
+  const [modalImage, setModalImage] = useState(null);
+  const [zoom, setZoom] = useState(1);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
   /* ── audio controls (only for direct file URLs) ── */
   const isDirectAudio = audio_url && !audio_url.includes('youtube') && !audio_url.includes('youtu.be');
@@ -71,6 +76,94 @@ export default function ListeningExercise({ exercise, onComplete }) {
 
   return (
     <div className="space-y-4">
+      {/* ── Topshiriq rasmlari ── */}
+      {content?.image_url && (
+        <div className="relative group rounded-xl overflow-hidden border border-gray-200 shadow-sm max-h-96 flex justify-center bg-gray-50 cursor-zoom-in" onClick={() => setModalImage(content.image_url)}>
+          <img src={content.image_url} alt="Listening task" className="max-w-full max-h-96 object-contain transition group-hover:opacity-90" />
+          <div className="absolute top-4 right-4 p-2 bg-white/80 backdrop-blur-md rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
+            <Maximize2 size={18} className="text-gray-700" />
+          </div>
+        </div>
+      )}
+      {content?.images?.map((img, idx) => (
+        <div key={idx} className="relative group rounded-xl overflow-hidden border border-gray-200 shadow-sm max-h-96 flex justify-center bg-gray-50 cursor-zoom-in" onClick={() => setModalImage(img)}>
+          <img src={img} alt={`Listening task ${idx + 1}`} className="max-w-full max-h-96 object-contain transition group-hover:opacity-90" />
+          <div className="absolute top-4 right-4 p-2 bg-white/80 backdrop-blur-md rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
+            <Maximize2 size={18} className="text-gray-700" />
+          </div>
+        </div>
+      ))}
+
+      {/* ── Image Modal (Professional Zoom & Pan) ── */}
+      {modalImage && (
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-md animate-in fade-in duration-300 overflow-hidden select-none"
+          onWheel={(e) => {
+            const delta = e.deltaY > 0 ? -0.1 : 0.1;
+            setZoom(prev => Math.min(5, Math.max(0.5, prev + delta)));
+          }}
+          onClick={() => { setModalImage(null); setZoom(1); setPosition({x:0, y:0}); }}
+        >
+          {/* Close Button */}
+          <button 
+            className="absolute top-6 right-6 p-4 bg-white/10 hover:bg-rose-500 text-white rounded-full transition-all z-50 shadow-2xl"
+            onClick={(e) => { e.stopPropagation(); setModalImage(null); }}
+          >
+            <X size={28} />
+          </button>
+
+          {/* Controls Overlay */}
+          <div 
+            className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-6 px-6 py-3 bg-white/10 backdrop-blur-2xl rounded-3xl border border-white/20 z-50 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-2">
+              <button onClick={() => setZoom(z => Math.max(0.5, z - 0.25))} className="p-2 text-white hover:bg-white/20 rounded-xl transition"><ZoomOut size={22} /></button>
+              <div className="w-16 text-center text-white font-black text-sm tracking-tighter">
+                {Math.round(zoom * 100)}%
+              </div>
+              <button onClick={() => setZoom(z => Math.min(5, z + 0.25))} className="p-2 text-white hover:bg-white/20 rounded-xl transition"><ZoomIn size={22} /></button>
+            </div>
+            <div className="h-6 w-px bg-white/20" />
+            <button 
+              onClick={() => { setZoom(1); setPosition({x:0, y:0}); }} 
+              className="px-4 py-1.5 text-[10px] text-white font-black bg-white/10 rounded-xl hover:bg-white/30 transition uppercase tracking-widest"
+            >
+              Reset
+            </button>
+          </div>
+
+          {/* Image Container with Pan Logic */}
+          <div 
+            className="w-full h-full flex items-center justify-center cursor-grab active:cursor-grabbing"
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              setIsDragging(true);
+              setDragStart({ x: e.clientX - position.x, y: e.clientY - position.y });
+            }}
+            onMouseMove={(e) => {
+              if (!isDragging) return;
+              setPosition({
+                x: e.clientX - dragStart.x,
+                y: e.clientY - dragStart.y
+              });
+            }}
+            onMouseUp={() => setIsDragging(false)}
+            onMouseLeave={() => setIsDragging(false)}
+          >
+            <img 
+              src={modalImage} 
+              alt="Zoomed view" 
+              draggable={false}
+              className="max-w-none transition-transform duration-75 ease-out pointer-events-none"
+              style={{ 
+                transform: `translate(${position.x}px, ${position.y}px) scale(${zoom})`,
+              }}
+            />
+          </div>
+        </div>
+      )}
+
       {/* ── Audio player ── */}
       {audio_url && (
         <div className="rounded-xl overflow-hidden bg-gradient-to-r from-teal-50 to-cyan-50 border border-teal-200 p-4">

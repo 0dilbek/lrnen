@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CheckCircle, XCircle } from 'lucide-react';
+import { CheckCircle2, XCircle, RotateCcw, ChevronRight, Type } from 'lucide-react';
 
 /**
  * content: {
@@ -33,7 +33,6 @@ export default function FillBlankExercise({ exercise, onComplete }) {
 
   const clickWord = (word) => {
     if (checked) return;
-    // Bo'sh qolgan birinchi satrga qo'yish
     const emptyIdx = sentences.findIndex((_, i) => !inputs[i]);
     if (emptyIdx !== -1) setInput(emptyIdx, word);
   };
@@ -42,7 +41,7 @@ export default function FillBlankExercise({ exercise, onComplete }) {
     (inputs[i] || '').trim().toLowerCase() ===
     sentences[i].answer.trim().toLowerCase();
 
-  const allFilled = sentences.every((_, i) => inputs[i]);
+  const allFilled = sentences.length > 0 && sentences.every((_, i) => inputs[i]);
 
   const handleCheck = () => {
     setChecked(true);
@@ -60,87 +59,123 @@ export default function FillBlankExercise({ exercise, onComplete }) {
     : null;
 
   return (
-    <div>
+    <div className="max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
       {word_panel && (
-        <div className="flex flex-wrap gap-2 mb-4 p-3 bg-blue-50 border border-blue-100 rounded-xl">
-          {word_panel.map((w, i) => (
-            <button
-              key={i}
-              onClick={() => clickWord(w)}
-              disabled={checked}
-              className="px-3 py-1 bg-white border border-blue-200 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-600 hover:text-white hover:border-blue-600 transition disabled:opacity-50"
-            >
-              {w}
-            </button>
-          ))}
+        <div className="mb-10 group">
+          <div className="flex items-center gap-2 mb-3 ml-2">
+            <Type size={14} className="text-indigo-400" />
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Tanlash uchun so'zlar</span>
+          </div>
+          <div className="flex flex-wrap gap-2.5 p-5 bg-white border border-slate-100 rounded-[2rem] shadow-xl shadow-slate-100/50">
+            {word_panel.map((w, i) => (
+              <button
+                key={i}
+                onClick={() => clickWord(w)}
+                disabled={checked}
+                className="px-5 py-2 bg-slate-50 border-2 border-slate-100 text-slate-600 rounded-xl text-sm font-bold hover:bg-indigo-600 hover:text-white hover:border-indigo-600 hover:shadow-lg hover:shadow-indigo-100 transition-all duration-300 transform active:scale-90 disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                {w}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
-      <div className="space-y-3 mb-5">
+      <div className="space-y-4 mb-10">
         {sentences.map((s, i) => {
           const correct = checked && isCorrect(i);
           const wrong = checked && !isCorrect(i);
           const parts = s.text.split('___');
+          
           return (
             <div
               key={i}
-              className={`flex flex-wrap items-center gap-1 p-3 rounded-xl border text-sm transition ${
-                correct ? 'bg-green-50 border-green-200' :
-                wrong   ? 'bg-red-50 border-red-200' :
-                          'bg-white border-gray-200'
+              className={`group flex flex-wrap items-center gap-3 p-5 rounded-2xl border-2 transition-all duration-500 ${
+                correct ? 'bg-emerald-50/50 border-emerald-200' :
+                wrong   ? 'bg-rose-50/50 border-rose-200' :
+                          'bg-white border-slate-50 hover:border-indigo-100 hover:shadow-md'
               }`}
             >
-              <span className="text-gray-500 font-medium mr-1">{i + 1}.</span>
-              <span className="text-gray-800">{parts[0]}</span>
-              <input
-                type="text"
-                value={inputs[i] || ''}
-                onChange={(e) => setInput(i, e.target.value)}
-                disabled={checked}
-                className={`w-28 text-center border-b-2 bg-transparent outline-none text-sm font-semibold transition ${
-                  correct ? 'border-green-500 text-green-700' :
-                  wrong   ? 'border-red-400 text-red-600' :
-                            'border-blue-400 text-blue-700'
-                }`}
-              />
-              {parts[1] && <span className="text-gray-800">{parts[1]}</span>}
+              <div className="flex items-center justify-center w-6 h-6 rounded-lg bg-slate-100 text-slate-400 text-[10px] font-black group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors">
+                {i + 1}
+              </div>
+              
+              <span className="text-slate-700 font-semibold text-lg">{parts[0]}</span>
+              
+              <div className="relative">
+                <input
+                  type="text"
+                  value={inputs[i] || ''}
+                  onChange={(e) => setInput(i, e.target.value)}
+                  disabled={checked}
+                  placeholder="..."
+                  className={`min-w-[100px] px-2 py-1 text-center border-b-4 bg-transparent outline-none text-lg font-black transition-all duration-300 ${
+                    correct ? 'border-emerald-500 text-emerald-600' :
+                    wrong   ? 'border-rose-400 text-rose-500' :
+                              'border-indigo-200 text-indigo-700 focus:border-indigo-500 focus:scale-105'
+                  }`}
+                  style={{ width: `${Math.max(4, (inputs[i]?.length || 4))}ch` }}
+                />
+              </div>
+              
+              {parts[1] && <span className="text-slate-700 font-semibold text-lg">{parts[1]}</span>}
+              
               {checked && (
-                <span className="ml-auto flex items-center gap-1">
+                <div className="ml-auto flex items-center gap-3 animate-in slide-in-from-right-4 duration-500">
                   {correct
-                    ? <CheckCircle size={16} className="text-green-500" />
-                    : <>
-                        <XCircle size={16} className="text-red-400" />
-                        <span className="text-xs text-green-600 font-medium">({s.answer})</span>
-                      </>
+                    ? <CheckCircle2 size={24} className="text-emerald-500" />
+                    : (
+                      <div className="flex items-center gap-2">
+                        <XCircle size={24} className="text-rose-400" />
+                        <div className="px-3 py-1 bg-emerald-500 text-white rounded-lg text-xs font-black shadow-lg shadow-emerald-100">
+                          {s.answer}
+                        </div>
+                      </div>
+                    )
                   }
-                </span>
+                </div>
               )}
             </div>
           );
         })}
       </div>
 
-      {!checked ? (
-        <button
-          onClick={handleCheck}
-          disabled={!allFilled}
-          className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white rounded-xl text-sm font-medium transition"
-        >
-          Tekshirish
-        </button>
-      ) : (
-        <div className="flex items-center gap-4">
-          <span className={`text-sm font-semibold ${score === sentences.length ? 'text-green-600' : 'text-orange-500'}`}>
-            {score}/{sentences.length} to'g'ri
-          </span>
+      <div className="flex flex-col items-center gap-6 border-t border-slate-100 pt-10">
+        {!checked ? (
           <button
-            onClick={handleRetry}
-            className="px-5 py-2 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition"
+            onClick={handleCheck}
+            disabled={!allFilled}
+            className="group flex items-center gap-3 px-10 py-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 disabled:cursor-not-allowed text-white rounded-[1.5rem] font-black text-lg transition-all duration-300 shadow-2xl shadow-indigo-200 hover:shadow-indigo-300 transform hover:-translate-y-1 active:translate-y-0"
           >
-            Qayta urinish
+            TEKSHIRISH
+            <ChevronRight size={20} className="group-hover:translate-x-1 transition-transform" />
           </button>
-        </div>
-      )}
+        ) : (
+          <div className="flex flex-col items-center gap-6 w-full">
+            <div className="flex items-center gap-5 px-8 py-4 bg-white border border-slate-100 rounded-3xl shadow-xl">
+              <div className="flex flex-col">
+                <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">To'g'ri javoblar</span>
+                <div className={`text-3xl font-black ${score === sentences.length ? 'text-emerald-500' : 'text-amber-500'}`}>
+                  {score} / {sentences.length}
+                </div>
+              </div>
+              <div className="h-12 w-px bg-slate-100" />
+              <div className="text-sm font-bold text-slate-500 max-w-[120px] leading-tight">
+                {score === sentences.length ? "Mukammal natija!" : "Xatolarni o'rganing va yana ko'ring."}
+              </div>
+            </div>
+            
+            <button
+              onClick={handleRetry}
+              className="flex items-center gap-2 px-6 py-3 bg-slate-50 hover:bg-white border border-slate-200 text-slate-500 hover:text-indigo-600 rounded-2xl text-xs font-black uppercase tracking-[0.1em] transition-all duration-300"
+            >
+              <RotateCcw size={14} strokeWidth={3} />
+              QAYTA URINISH
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
+

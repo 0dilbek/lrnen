@@ -37,7 +37,7 @@ class Level(models.Model):
 class Lesson(models.Model):
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
-    video_url = models.URLField()
+    video_url = models.URLField(blank=True, null=True)
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, related_name='lessons')
     levels = models.ManyToManyField(Level, blank=True, related_name='lessons')
     order = models.PositiveIntegerField(default=0)
