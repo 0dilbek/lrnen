@@ -8,7 +8,7 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-me-in-producti
 
 DEBUG = config('DEBUG', default=True, cast=bool)
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='*').split(',')
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -102,7 +102,9 @@ SIMPLE_JWT = {
 }
 
 SUPER_ADMIN_USERNAME = 'admin'
-STATICFILES_DIRS = ['/home/lrnenuz/lrnen.uz/django/static_files']
-STATIC_ROOT = '/home/lrnenuz/lrnen.uz/django/static'
-MEDIA_URL = 'media/'
-MEDIA_ROOT = '/home/lrnenuz/lrnen.uz/django/media'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_DIRS = [
+    BASE_DIR / 'static',
+]
+if (BASE_DIR / 'static').exists():
+    STATICFILES_DIRS.append(BASE_DIR / 'static')

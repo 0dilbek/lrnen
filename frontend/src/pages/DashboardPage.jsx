@@ -153,7 +153,7 @@ export default function DashboardPage() {
             className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${
               !selectedCategory
                 ? 'bg-gray-900 text-white shadow-sm'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
             }`}
           >
             Hammasi

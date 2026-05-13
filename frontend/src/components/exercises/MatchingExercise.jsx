@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { CheckCircle, XCircle } from 'lucide-react';
+import { CheckCircle2, XCircle, RotateCcw, Check, Sparkles } from 'lucide-react';
 
 /**
  * content: {
@@ -19,14 +19,24 @@ function normalizeMatching(content) {
   return { left: [], right: [], pairs: [] };
 }
 
+const PAIR_COLORS = [
+  'border-blue-400 bg-blue-50 text-blue-700',
+  'border-purple-400 bg-purple-50 text-purple-700',
+  'border-amber-400 bg-amber-50 text-amber-700',
+  'border-emerald-400 bg-emerald-50 text-emerald-700',
+  'border-rose-400 bg-rose-50 text-rose-700',
+  'border-indigo-400 bg-indigo-50 text-indigo-700',
+  'border-orange-400 bg-orange-50 text-orange-700',
+  'border-cyan-400 bg-cyan-50 text-cyan-700',
+];
+
 export default function MatchingExercise({ exercise, onComplete }) {
   const { left, right, pairs } = normalizeMatching(exercise.content);
 
-  // right tomonni aralashtirish
   const shuffledRight = useMemo(() => {
     const indexed = right.map((text, i) => ({ text, origIdx: i }));
     return indexed.sort(() => Math.random() - 0.5);
-  }, []);
+  }, [right]);
 
   const [selected, setSelected] = useState(null); // { side: 'left'|'right', idx }
   const [matches, setMatches] = useState({});     // { leftIdx: rightOrigIdx }
@@ -48,16 +58,12 @@ export default function MatchingExercise({ exercise, onComplete }) {
       return;
     }
 
-    // Pair aniqlash
     const leftIdx = side === 'left' ? idx : selected.idx;
     const rightShuffledIdx = side === 'right' ? idx : selected.idx;
     const rightOrigIdx = shuffledRight[rightShuffledIdx].origIdx;
 
-    // Agar allaqachon matched bo'lsa, o'chirish
     const newMatches = { ...matches };
-    // Remove any previous match for this leftIdx
     delete newMatches[leftIdx];
-    // Remove any previous match where rightOrigIdx was used
     Object.keys(newMatches).forEach((k) => {
       if (newMatches[k] === rightOrigIdx) delete newMatches[k];
     });
@@ -67,7 +73,7 @@ export default function MatchingExercise({ exercise, onComplete }) {
     setSelected(null);
   };
 
-  const allMatched = left.every((_, i) => matches[i] !== undefined);
+  const allMatched = left.length > 0 && left.every((_, i) => matches[i] !== undefined);
 
   const handleCheck = () => {
     setChecked(true);
@@ -81,109 +87,143 @@ export default function MatchingExercise({ exercise, onComplete }) {
     setChecked(false);
   };
 
-  const getLeftStatus = (i) => {
-    if (!checked) return null;
-    return matches[i] === pairs[i] ? 'correct' : 'wrong';
-  };
-
-  const getRightStatus = (shIdx) => {
-    if (!checked) return null;
-    const origIdx = shuffledRight[shIdx].origIdx;
-    const leftIdx = Object.keys(matches).find((k) => matches[k] === origIdx);
-    if (leftIdx === undefined) return 'wrong';
-    return Number(leftIdx) !== undefined && matches[Number(leftIdx)] === pairs[Number(leftIdx)]
-      ? 'correct' : 'wrong';
-  };
-
   const score = checked ? left.filter((_, i) => matches[i] === pairs[i]).length : null;
 
-  const isLeftSelected = selected?.side === 'left';
-  const isRightSelected = selected?.side === 'right';
-
   return (
-    <div>
-      <div className="grid grid-cols-2 gap-3 mb-5">
+    <div className="max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <div className="grid grid-cols-2 gap-8 mb-8 relative">
+        {/* Connection visualization could go here, but let's use color coding for better clarity */}
+        
         {/* Left column */}
-        <div className="space-y-2">
+        <div className="space-y-3">
+          <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-1">Savollar</div>
           {left.map((text, i) => {
-            const isActive = isLeftSelected && selected.idx === i;
-            const isMatched = matchedLeftIdxs.has(i);
-            const status = getLeftStatus(i);
+            const isActive = selected?.side === 'left' && selected.idx === i;
+            const rightOrigIdx = matches[i];
+            const isMatched = rightOrigIdx !== undefined;
+            
+            let statusClass = 'bg-white border-slate-200 text-slate-700 hover:border-indigo-400 hover:shadow-md';
+            if (checked) {
+              statusClass = rightOrigIdx === pairs[i] 
+                ? 'bg-emerald-50 border-emerald-500 text-emerald-700' 
+                : 'bg-rose-50 border-rose-500 text-rose-700';
+            } else if (isActive) {
+              statusClass = 'bg-indigo-600 border-indigo-600 text-white shadow-lg ring-2 ring-indigo-100 scale-105 z-10';
+            } else if (isMatched) {
+              statusClass = PAIR_COLORS[i % PAIR_COLORS.length] + ' shadow-sm opacity-90';
+            }
+
             return (
               <button
                 key={i}
                 onClick={() => handleClick('left', i)}
-                className={`w-full text-left px-3 py-2.5 rounded-xl border text-sm transition ${
-                  status === 'correct' ? 'bg-green-50 border-green-300 text-green-800' :
-                  status === 'wrong'   ? 'bg-red-50 border-red-300 text-red-700' :
-                  isActive ? 'bg-blue-600 text-white border-blue-600 shadow-md' :
-                  isMatched ? 'bg-blue-50 border-blue-300 text-blue-800' :
-                  'bg-white border-gray-200 text-gray-800 hover:border-blue-400'
-                }`}
+                className={`w-full text-left p-4 rounded-2xl border-2 text-sm font-semibold transition-all duration-300 relative group transform active:scale-95 ${statusClass}`}
               >
-                <span className="font-medium text-xs opacity-60 mr-1">{i + 1}.</span>
-                {text}
+                <div className="flex items-center gap-3">
+                  <span className={`flex items-center justify-center w-5 h-5 rounded-full text-[9px] font-bold ${isActive ? 'bg-indigo-400/30' : 'bg-slate-100 text-slate-400'}`}>
+                    {i + 1}
+                  </span>
+                  <span className="flex-1">{text}</span>
+                  {isMatched && !checked && (
+                    <div className="w-2 h-2 rounded-full bg-current animate-pulse" />
+                  )}
+                  {checked && (
+                    rightOrigIdx === pairs[i] 
+                      ? <CheckCircle2 size={16} className="text-emerald-500" />
+                      : <XCircle size={16} className="text-rose-500" />
+                  )}
+                </div>
               </button>
             );
           })}
         </div>
 
         {/* Right column */}
-        <div className="space-y-2">
+        <div className="space-y-3">
+          <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-1 text-right">Javoblar</div>
           {shuffledRight.map((item, shIdx) => {
-            const isActive = isRightSelected && selected.idx === shIdx;
-            const isMatched = matchedRightOrigIdxs.has(item.origIdx);
-            const status = getRightStatus(shIdx);
+            const isActive = selected?.side === 'right' && selected.idx === shIdx;
+            const leftIdxMatch = Object.keys(matches).find(k => matches[k] === item.origIdx);
+            const isMatched = leftIdxMatch !== undefined;
+            
+            let statusClass = 'bg-white border-slate-200 text-slate-700 hover:border-indigo-400 hover:shadow-md';
+            if (checked) {
+              const isCorrect = leftIdxMatch !== undefined && matches[leftIdxMatch] === pairs[leftIdxMatch];
+              statusClass = isCorrect 
+                ? 'bg-emerald-50 border-emerald-500 text-emerald-700' 
+                : 'bg-rose-50 border-rose-500 text-rose-700';
+            } else if (isActive) {
+              statusClass = 'bg-indigo-600 border-indigo-600 text-white shadow-lg ring-2 ring-indigo-100 scale-105 z-10';
+            } else if (isMatched) {
+              statusClass = PAIR_COLORS[Number(leftIdxMatch) % PAIR_COLORS.length] + ' shadow-sm opacity-90';
+            }
+
             return (
               <button
                 key={shIdx}
                 onClick={() => handleClick('right', shIdx)}
-                className={`w-full text-left px-3 py-2.5 rounded-xl border text-sm transition ${
-                  status === 'correct' ? 'bg-green-50 border-green-300 text-green-800' :
-                  status === 'wrong'   ? 'bg-red-50 border-red-300 text-red-700' :
-                  isActive ? 'bg-purple-600 text-white border-purple-600 shadow-md' :
-                  isMatched ? 'bg-purple-50 border-purple-300 text-purple-800' :
-                  'bg-white border-gray-200 text-gray-800 hover:border-purple-400'
-                }`}
+                className={`w-full text-right p-4 rounded-2xl border-2 text-sm font-semibold transition-all duration-300 transform active:scale-95 ${statusClass}`}
               >
-                {item.text}
+                <div className="flex items-center justify-end gap-3">
+                  {isMatched && !checked && (
+                    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/40 text-[9px] font-black uppercase tracking-tighter">
+                      <Check size={10} strokeWidth={4} /> Juftlandi
+                    </div>
+                  )}
+                  <span className="flex-1">{item.text}</span>
+                </div>
               </button>
             );
           })}
         </div>
       </div>
 
-      {selected && !checked && (
-        <p className="text-xs text-blue-600 mb-3">
-          ↑ Tanlandi — endi ikkinchi tomoni bosing
-        </p>
-      )}
-
-      {!checked ? (
-        <button
-          onClick={handleCheck}
-          disabled={!allMatched}
-          className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white rounded-xl text-sm font-medium transition"
-        >
-          Tekshirish
-        </button>
-      ) : (
-        <div className="flex items-center gap-4">
-          <span className={`text-sm font-semibold flex items-center gap-1.5 ${score === left.length ? 'text-green-600' : 'text-orange-500'}`}>
-            {score === left.length
-              ? <CheckCircle size={16} />
-              : <XCircle size={16} />
-            }
-            {score}/{left.length} to'g'ri
-          </span>
-          <button
-            onClick={handleRetry}
-            className="px-5 py-2 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition"
-          >
-            Qayta urinish
-          </button>
-        </div>
-      )}
+      <div className="flex flex-col items-center gap-6 mt-12 pt-8 border-t border-slate-100">
+        {!checked ? (
+          <div className="flex flex-col items-center gap-4">
+            {selected && (
+              <div className="flex items-center gap-2 px-4 py-1.5 bg-indigo-50 text-indigo-600 rounded-full text-xs font-bold animate-bounce">
+                <Sparkles size={12} />
+                Endi ikkinchi tomondan mosini tanlang
+              </div>
+            )}
+            <button
+              onClick={handleCheck}
+              disabled={!allMatched}
+              className="px-10 py-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 disabled:cursor-not-allowed text-white rounded-2xl font-black transition-all duration-300 shadow-xl shadow-indigo-100 hover:shadow-indigo-200 transform hover:-translate-y-1 active:translate-y-0"
+            >
+              TEKSHIRISH
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-6 w-full animate-in zoom-in duration-500">
+            <div className="relative group">
+              <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl blur opacity-25 group-hover:opacity-40 transition duration-1000 group-hover:duration-200" />
+              <div className="relative flex items-center gap-4 px-8 py-4 bg-white border border-slate-100 rounded-2xl shadow-xl">
+                <div className={`text-3xl font-black ${score === left.length ? 'text-emerald-500' : 'text-amber-500'}`}>
+                  {score} / {left.length}
+                </div>
+                <div className="h-10 w-px bg-slate-100" />
+                <div className="flex flex-col">
+                  <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Natija</span>
+                  <span className="text-sm font-bold text-slate-600 italic">
+                    {score === left.length ? "Mukammal!" : "Yaxshi urinish!"}
+                  </span>
+                </div>
+              </div>
+            </div>
+            
+            <button
+              onClick={handleRetry}
+              className="flex items-center gap-2 px-6 py-3 bg-slate-50 hover:bg-white border border-slate-200 text-slate-500 hover:text-indigo-600 rounded-xl text-xs font-black uppercase tracking-widest transition-all duration-300"
+            >
+              <RotateCcw size={14} strokeWidth={3} />
+              QAYTA BOSHLASH
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
+
