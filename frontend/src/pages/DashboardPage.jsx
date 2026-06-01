@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useGame } from '../context/GameContext';
 import api from '../api';
-import { Search, BookOpen, CheckCircle, Clock, Loader2, Zap, Flame } from 'lucide-react';
+import { Search, BookOpen, CheckCircle, Clock, Loader2, Zap, Flame, Lock } from 'lucide-react';
 
 // Har bir kategoriya indeksiga qarab rang va emoji
 const CARD_THEMES = [
@@ -239,24 +239,35 @@ export default function DashboardPage() {
 
 function LessonCard({ lesson, progress, onClick }) {
   const theme = getTheme(lesson.category);
+  const isLocked = lesson.is_locked;
   const isCompleted = progress?.status === 'completed';
   const isInProgress = progress?.status === 'in-progress';
   const score = progress?.score || 0;
 
   return (
     <div
-      onClick={onClick}
-      className="group bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer overflow-hidden hover:-translate-y-1"
+      onClick={isLocked ? undefined : onClick}
+      className={`group bg-white rounded-2xl border shadow-sm transition-all duration-300 overflow-hidden
+        ${isLocked
+          ? 'border-gray-200 opacity-60 cursor-not-allowed'
+          : 'border-gray-100 hover:shadow-xl cursor-pointer hover:-translate-y-1'
+        }`}
     >
       {/* Top banner */}
-      <div className={`bg-gradient-to-br ${theme.gradient} h-24 relative flex items-center justify-center`}>
+      <div className={`bg-gradient-to-br ${theme.gradient} h-24 relative flex items-center justify-center
+        ${isLocked ? 'brightness-75' : ''}`}>
         <span className="text-5xl drop-shadow-sm select-none">{theme.emoji}</span>
-        {isCompleted && (
+        {isLocked && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-t-2xl">
+            <Lock size={28} className="text-white drop-shadow" />
+          </div>
+        )}
+        {!isLocked && isCompleted && (
           <div className="absolute top-2 right-2 bg-white/90 rounded-full p-1 shadow-sm">
             <CheckCircle size={16} className="text-green-500" />
           </div>
         )}
-        {isInProgress && (
+        {!isLocked && isInProgress && (
           <div className="absolute top-2 right-2 bg-white/90 rounded-full p-1 shadow-sm">
             <Clock size={16} className="text-yellow-500" />
           </div>
@@ -285,8 +296,13 @@ function LessonCard({ lesson, progress, onClick }) {
           <p className="text-sm text-gray-500 line-clamp-2 mb-3">{lesson.description}</p>
         )}
 
-        {/* Progress */}
-        {progress ? (
+        {/* Progress / Lock state */}
+        {isLocked ? (
+          <div className="flex items-center gap-1.5 text-xs text-gray-400 mt-auto">
+            <Lock size={12} />
+            Oldingi darsni yakunlang
+          </div>
+        ) : progress ? (
           <div className="mt-auto">
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs text-gray-500 font-medium">

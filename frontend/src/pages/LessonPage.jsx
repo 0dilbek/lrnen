@@ -113,6 +113,10 @@ export default function LessonPage() {
       api.get(`/quiz/exercises/?lesson=${id}`),
       api.get(`/comments/?lesson=${id}`),
     ]).then(([l, v, q, ex, c]) => {
+      if (l.data.is_locked) {
+        navigate('/', { replace: true });
+        return;
+      }
       setLesson(l.data);
       setVocab(v.data);
       setQuizzes(q.data);

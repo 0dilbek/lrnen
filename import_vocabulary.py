@@ -98,17 +98,15 @@ def main():
         if not words:
             continue
             
-        # Lesson'ni qidirish
+        # [Book 1] darslarini birinchi izla
         unit_str = f"Unit {unit_num:02d}"
-        lesson = Lesson.objects.filter(title__icontains=unit_str).first()
-        
+        lesson = Lesson.objects.filter(
+            title__startswith='[Book 1]',
+            title__icontains=unit_str,
+        ).first()
+
         if not lesson:
-            unit_str_alt = f"Unit {unit_num}"
-            lesson = Lesson.objects.filter(title__icontains=unit_str_alt).first()
-            
-        if not lesson:
-            # Agar topilmasa, vaqtinchalik "Book 1" darslaridan birini tanlaymiz yoki xabar beramiz
-            print(f"⚠️ Unit {unit_num} uchun dars topilmadi. O'tkazib yuborildi.")
+            print(f"⚠️ [Book 1] Unit {unit_num} uchun dars topilmadi. O'tkazib yuborildi.")
             continue
             
         print(f"✅ {lesson.title} darsiga {len(words)} ta so'z qo'shilmoqda...")

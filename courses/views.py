@@ -71,6 +71,26 @@ class LevelListView(APIView):
         return Response(LevelSerializer(levels, many=True).data)
 
 
+def _is_lesson_locked(user, lesson):
+    """O'quvchi uchun dars bloklangan-bloklangmasligini aniqlaydi."""
+    if user.role != 'student':
+        return False
+    level_slugs = list(user.levels.values_list('slug', flat=True))
+    if not level_slugs:
+        return False
+    prev = (
+        Lesson.objects
+        .filter(levels__slug__in=level_slugs, order__lt=lesson.order)
+        .order_by('-order', '-id')
+        .first()
+    )
+    if prev is None:
+        return False
+    return not UserProgress.objects.filter(
+        user=user, lesson=prev, status='completed'
+    ).exists()
+
+
 class LessonListView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -91,7 +111,16 @@ class LessonListView(APIView):
             qs = qs.filter(category_id=category)
         if level:
             qs = qs.filter(levels__slug=level)
-        return Response(LessonSerializer(qs, many=True).data)
+
+        lessons = list(qs)
+        data = LessonSerializer(lessons, many=True).data
+
+        result = []
+        for lesson, row in zip(lessons, data):
+            row = dict(row)
+            row['is_locked'] = _is_lesson_locked(request.user, lesson)
+            result.append(row)
+        return Response(result)
 
     def post(self, request):
         if request.user.role != 'admin':
@@ -115,7 +144,9 @@ class LessonDetailView(APIView):
         obj = self.get_object(pk)
         if not obj:
             return Response({'detail': 'Not found'}, status=404)
-        return Response(LessonSerializer(obj).data)
+        data = dict(LessonSerializer(obj).data)
+        data['is_locked'] = _is_lesson_locked(request.user, obj)
+        return Response(data)
 
     def put(self, request, pk):
         if request.user.role != 'admin':
