@@ -16,3 +16,12 @@ book 1/
 audio 1/
 static/
 Beginner vocabulary last one.docx
+
+# Build artifacts
+*.zip
+dist/
+
+# Generated / temporary files
+seed_book1_progress.json
+scratch/
+check_models.py
