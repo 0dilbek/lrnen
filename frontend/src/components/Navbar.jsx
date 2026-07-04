@@ -5,7 +5,6 @@ import { useTheme } from '../context/ThemeContext';
 import api from '../api';
 import { BookOpen, LayoutDashboard, BookMarked, BarChart2, Trophy, LogOut, Shield, Sun, Moon } from 'lucide-react';
 
-// Avatar ranglari — username bo'yicha deterministik
 const AVATAR_COLORS = [
   'from-violet-500 to-purple-600',
   'from-blue-500 to-cyan-500',
@@ -21,14 +20,13 @@ function getAvatarColor(username = '') {
   return AVATAR_COLORS[sum % AVATAR_COLORS.length];
 }
 
-// Mini doira progress (SVG)
 function ProgressRing({ percent, size = 40, stroke = 3 }) {
   const r = (size - stroke * 2) / 2;
   const circ = 2 * Math.PI * r;
   const offset = circ - (percent / 100) * circ;
   return (
     <svg width={size} height={size} className="-rotate-90">
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#e5e7eb" strokeWidth={stroke} />
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#2a3548" strokeWidth={stroke} />
       <circle
         cx={size / 2} cy={size / 2} r={r} fill="none"
         stroke="url(#pg)" strokeWidth={stroke}
@@ -56,7 +54,6 @@ export default function Navbar() {
   useEffect(() => {
     if (user && user.role !== 'admin') {
       api.get('/courses/stats/').then(({ data }) => {
-        // overall progress: yakunlangan / boshlangan
         const total = data.total_started || 0;
         const done = data.completed || 0;
         setProgressPct(total > 0 ? Math.round((done / total) * 100) : 0);
@@ -67,77 +64,46 @@ export default function Navbar() {
   const handleLogout = () => { logout(); navigate('/login'); };
   const isActive = (path) => location.pathname.startsWith(path);
 
-  if (!user) return null;
+  if (!user || user.role === 'admin') return null;
 
   const initials = (user.full_name || user.username || '?')
     .split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
   const avatarGrad = getAvatarColor(user.username);
 
   return (
-    <nav className="bg-white border-b border-gray-100 sticky top-0 z-50 shadow-sm">
+    <nav className="student-nav">
       <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-        {/* Logo */}
-        <Link to={user.role === 'admin' ? '/admin' : '/dashboard'} className="flex items-center gap-2 shrink-0">
-          <div className="bg-gradient-to-br from-blue-500 to-violet-600 p-1.5 rounded-xl shadow-sm">
+        <Link to="/dashboard" className="flex items-center gap-2 shrink-0">
+          <div className="bg-gradient-to-br from-indigo-500 to-violet-600 p-1.5 rounded-xl shadow-lg shadow-indigo-500/20">
             <BookOpen className="text-white" size={20} />
           </div>
-          <span className="font-extrabold text-gray-900 text-lg hidden sm:block">Learn English</span>
+          <span className="font-extrabold text-white text-lg hidden sm:block">Learn English</span>
         </Link>
 
-        {/* Nav links */}
         <div className="flex items-center gap-1">
-          {user.role === 'admin' ? (
-            <>
-              <NavLink to="/admin" icon={<LayoutDashboard size={17} />} label="Dashboard" active={location.pathname === '/admin'} />
-              <NavLink to="/admin/students" icon={<BarChart2 size={17} />} label="O'quvchilar" active={isActive('/admin/students')} />
-              <NavLink to="/admin/lessons" icon={<BookMarked size={17} />} label="Darslar" active={isActive('/admin/lessons')} />
-            </>
-          ) : (
-            <>
-              <NavLink to="/dashboard" icon={<LayoutDashboard size={17} />} label="Bosh sahifa" active={location.pathname === '/dashboard'} />
-              <NavLink to="/my-lessons" icon={<BookMarked size={17} />} label="Darslarim" active={isActive('/my-lessons')} />
-              <NavLink to="/results" icon={<BarChart2 size={17} />} label="Natijalar" active={isActive('/results')} />
-              <NavLink to="/leaderboard" icon={<Trophy size={17} />} label="Reyting" active={isActive('/leaderboard')} />
-            </>
-          )}
+          <NavLink to="/dashboard" icon={<LayoutDashboard size={17} />} label="Bosh sahifa" active={location.pathname === '/dashboard'} />
+          <NavLink to="/my-lessons" icon={<BookMarked size={17} />} label="Darslarim" active={isActive('/my-lessons')} />
+          <NavLink to="/results" icon={<BarChart2 size={17} />} label="Natijalar" active={isActive('/results')} />
+          <NavLink to="/leaderboard" icon={<Trophy size={17} />} label="Reyting" active={isActive('/leaderboard')} />
         </div>
 
-        {/* Right side */}
         <div className="flex items-center gap-2 shrink-0">
-          {/* Dark mode toggle */}
-          <button
-            onClick={toggle}
-            className="p-2 rounded-xl text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition"
-            title={dark ? 'Kunduzgi mavzu' : 'Tungi mavzu'}
-          >
+          <button onClick={toggle} className="p-2 rounded-xl text-slate-500 hover:text-slate-300 hover:bg-surface-200 transition" title={dark ? 'Kunduzgi' : 'Tungi'}>
             {dark ? <Sun size={18} /> : <Moon size={18} />}
           </button>
-
-          {/* Avatar + progress ring */}
           <div className="relative flex items-center" title={`Progress: ${progressPct}%`}>
-            {user.role !== 'admin' && (
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <ProgressRing percent={progressPct} size={40} stroke={3} />
-              </div>
-            )}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <ProgressRing percent={progressPct} size={40} stroke={3} />
+            </div>
             <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${avatarGrad} flex items-center justify-center text-white font-bold text-xs shadow-sm select-none`}>
-              {user.role === 'admin' ? <Shield size={14} /> : initials}
+              {initials}
             </div>
           </div>
-
-          {/* Name */}
           <div className="text-right hidden sm:block">
-            <p className="text-sm font-semibold text-gray-800 leading-tight">{user.full_name || user.username}</p>
-            <p className="text-xs text-gray-400">
-              {user.role === 'admin' ? '👑 Admin' : `⭐ ${progressPct}%`}
-            </p>
+            <p className="text-sm font-semibold text-slate-200 leading-tight">{user.full_name || user.username}</p>
+            <p className="text-xs text-slate-500">⭐ {progressPct}%</p>
           </div>
-
-          {/* Logout */}
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-red-500 transition px-3 py-2 rounded-xl hover:bg-red-50"
-          >
+          <button onClick={handleLogout} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-red-400 transition px-3 py-2 rounded-xl hover:bg-red-500/10">
             <LogOut size={16} />
             <span className="hidden sm:inline">Chiqish</span>
           </button>
@@ -153,8 +119,8 @@ function NavLink({ to, icon, label, active }) {
       to={to}
       className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition ${
         active
-          ? 'bg-gradient-to-r from-blue-50 to-violet-50 text-blue-700'
-          : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+          ? 'bg-indigo-500/15 text-indigo-300 border border-indigo-500/20'
+          : 'text-slate-400 hover:bg-surface-200 hover:text-slate-200'
       }`}
     >
       {icon}

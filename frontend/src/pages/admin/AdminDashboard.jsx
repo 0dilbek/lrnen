@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../api';
-import { Users, BookOpen, CheckCircle, BarChart2, Loader2 } from 'lucide-react';
+import { Users, BookOpen, CheckCircle, BarChart2, Loader2, ArrowRight } from 'lucide-react';
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
@@ -13,61 +13,97 @@ export default function AdminDashboard() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="animate-spin text-blue-600" size={40} />
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <Loader2 className="animate-spin text-indigo-400" size={36} />
       </div>
     );
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
-      <p className="text-gray-500 mb-8">Platformaning umumiy ko'rinishi</p>
-
+    <div className="p-8">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <AdminStat icon={<Users size={24} />} value={stats?.total_students || 0} label="O'quvchilar" color="blue" to="/admin/students" />
-        <AdminStat icon={<BookOpen size={24} />} value={stats?.total_lessons || 0} label="Darslar" color="indigo" to="/admin/lessons" />
-        <AdminStat icon={<BarChart2 size={24} />} value={stats?.total_categories || 0} label="Kategoriyalar" color="purple" to="/admin/lessons" />
-        <AdminStat icon={<CheckCircle size={24} />} value={stats?.completed || 0} label="Yakunlangan" color="green" />
+        <StatCard
+          icon={<Users size={22} />}
+          value={stats?.total_students || 0}
+          label="O'quvchilar"
+          color="indigo"
+          to="/admin/students"
+        />
+        <StatCard
+          icon={<BookOpen size={22} />}
+          value={stats?.total_lessons || 0}
+          label="Darslar"
+          color="violet"
+          to="/admin/lessons"
+        />
+        <StatCard
+          icon={<BarChart2 size={22} />}
+          value={stats?.total_categories || 0}
+          label="Kategoriyalar"
+          color="cyan"
+          to="/admin/lessons"
+        />
+        <StatCard
+          icon={<CheckCircle size={22} />}
+          value={stats?.completed || 0}
+          label="Yakunlangan"
+          color="emerald"
+        />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <QuickAction to="/admin/students" icon={<Users size={20} />} title="O'quvchilar" desc="Ro'yxatdan o'tganlar va faollik" />
-        <QuickAction to="/admin/lessons" icon={<BookOpen size={20} />} title="Kontent boshqaruvi" desc="Darslar, testlar, kategoriyalar" />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <QuickLink
+          to="/admin/students"
+          icon={<Users size={22} />}
+          title="O'quvchilar boshqaruvi"
+          desc="Yangi o'quvchi qo'shish, parol yangilash, levellar"
+        />
+        <QuickLink
+          to="/admin/lessons"
+          icon={<BookOpen size={22} />}
+          title="Kontent boshqaruvi"
+          desc="48 ta unit — darslar, mashqlar, lug'at, testlar"
+        />
       </div>
     </div>
   );
 }
 
-function AdminStat({ icon, value, label, color, to }) {
-  const colors = {
-    blue: 'bg-blue-600',
-    indigo: 'bg-indigo-600',
-    purple: 'bg-purple-600',
-    green: 'bg-green-600',
+function StatCard({ icon, value, label, color, to }) {
+  const gradients = {
+    indigo: 'from-indigo-500/20 to-indigo-600/5 border-indigo-500/20 text-indigo-400',
+    violet: 'from-violet-500/20 to-violet-600/5 border-violet-500/20 text-violet-400',
+    cyan: 'from-cyan-500/20 to-cyan-600/5 border-cyan-500/20 text-cyan-400',
+    emerald: 'from-emerald-500/20 to-emerald-600/5 border-emerald-500/20 text-emerald-400',
   };
-  const content = (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition">
-      <div className={`inline-flex p-2 rounded-xl ${colors[color]} mb-3`}>
-        <span className="text-white">{icon}</span>
+
+  const inner = (
+    <div className={`stat-card bg-gradient-to-br ${gradients[color]} border`}>
+      <div className={`inline-flex p-2.5 rounded-xl bg-surface-200 mb-4 ${gradients[color].split(' ').pop()}`}>
+        {icon}
       </div>
-      <p className="text-3xl font-bold text-gray-900">{value}</p>
-      <p className="text-sm text-gray-500 mt-1">{label}</p>
+      <p className="text-3xl font-bold admin-text-title">{value}</p>
+      <p className="text-sm admin-text-muted mt-1">{label}</p>
     </div>
   );
-  return to ? <Link to={to}>{content}</Link> : content;
+
+  return to ? <Link to={to} className="block">{inner}</Link> : inner;
 }
 
-function QuickAction({ to, icon, title, desc }) {
+function QuickLink({ to, icon, title, desc }) {
   return (
-    <Link to={to} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 flex items-start gap-4 hover:shadow-md transition group">
-      <div className="bg-blue-50 p-3 rounded-xl group-hover:bg-blue-100 transition">
-        <span className="text-blue-600">{icon}</span>
+    <Link
+      to={to}
+      className="admin-card p-6 flex items-center gap-4 group hover:border-indigo-500/30 transition-all"
+    >
+      <div className="p-3 rounded-xl bg-indigo-500/15 text-indigo-400 group-hover:bg-indigo-500/25 transition">
+        {icon}
       </div>
-      <div>
-        <p className="font-semibold text-gray-900">{title}</p>
-        <p className="text-sm text-gray-500 mt-0.5">{desc}</p>
+      <div className="flex-1">
+        <p className="font-semibold admin-text-title">{title}</p>
+        <p className="text-sm admin-text-muted mt-0.5">{desc}</p>
       </div>
+      <ArrowRight size={18} className="text-slate-600 group-hover:text-indigo-400 transition" />
     </Link>
   );
 }

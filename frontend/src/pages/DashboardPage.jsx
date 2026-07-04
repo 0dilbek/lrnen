@@ -3,51 +3,23 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useGame } from '../context/GameContext';
 import api from '../api';
-import { Search, BookOpen, CheckCircle, Clock, Loader2, Zap, Flame, Lock } from 'lucide-react';
-
-// Har bir kategoriya indeksiga qarab rang va emoji
-const CARD_THEMES = [
-  { gradient: 'from-violet-500 to-purple-600',  pill: 'bg-violet-100 text-violet-700',  emoji: '📚' },
-  { gradient: 'from-blue-500 to-cyan-500',       pill: 'bg-blue-100 text-blue-700',      emoji: '✏️' },
-  { gradient: 'from-emerald-500 to-teal-500',    pill: 'bg-emerald-100 text-emerald-700',emoji: '🌱' },
-  { gradient: 'from-orange-400 to-rose-500',     pill: 'bg-orange-100 text-orange-700',  emoji: '🔥' },
-  { gradient: 'from-pink-500 to-fuchsia-500',    pill: 'bg-pink-100 text-pink-700',      emoji: '⭐' },
-  { gradient: 'from-yellow-400 to-orange-400',   pill: 'bg-yellow-100 text-yellow-700',  emoji: '🏆' },
-  { gradient: 'from-sky-500 to-indigo-500',      pill: 'bg-sky-100 text-sky-700',        emoji: '💡' },
-  { gradient: 'from-red-500 to-pink-500',        pill: 'bg-red-100 text-red-700',        emoji: '🎯' },
-];
-
-function getTheme(categoryId) {
-  return CARD_THEMES[(categoryId ?? 0) % CARD_THEMES.length];
-}
+import { Search, CheckCircle, Clock, Loader2, Zap, Flame, ChevronRight } from 'lucide-react';
+import { formatLessonTitle, getUnitNumber } from '../utils/lessonDisplay';
 
 export default function DashboardPage() {
   const { user } = useAuth();
   const { xp, streak, badges } = useGame();
-  const [categories, setCategories] = useState([]);
-  const [levels, setLevels] = useState([]);
   const [lessons, setLessons] = useState([]);
   const [search, setSearch] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('');
-  const [selectedLevel, setSelectedLevel] = useState('');
   const [progress, setProgress] = useState({});
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
     Promise.all([
-      api.get('/courses/categories/'),
-      api.get('/courses/levels/'),
       api.get('/courses/lessons/'),
       api.get('/courses/progress/'),
-    ]).then(([cats, lvls, lsns, prog]) => {
-      setCategories(cats.data);
-      // Student o'ziga biriktirilgan levellar bo'lsa, faqat shularni ko'rsat
-      const assignedSlugs = new Set((user?.levels || []).map((l) => l.slug));
-      const filteredLevels = assignedSlugs.size > 0
-        ? lvls.data.filter((l) => assignedSlugs.has(l.slug))
-        : lvls.data;
-      setLevels(filteredLevels);
+    ]).then(([lsns, prog]) => {
       setLessons(lsns.data);
       const progressMap = {};
       prog.data.forEach((p) => { progressMap[p.lesson] = p; });
@@ -56,75 +28,63 @@ export default function DashboardPage() {
   }, []);
 
   const filtered = lessons.filter((l) => {
-    const matchSearch =
-      l.title.toLowerCase().includes(search.toLowerCase()) ||
-      l.description.toLowerCase().includes(search.toLowerCase());
-    const matchCat = !selectedCategory || l.category === Number(selectedCategory);
-    const matchLevel = !selectedLevel || l.levels?.some((lv) => lv.slug === selectedLevel);
-    return matchSearch && matchCat && matchLevel;
+    const title = formatLessonTitle(l.title);
+    return title.toLowerCase().includes(search.toLowerCase());
   });
 
   const completedCount = Object.values(progress).filter((p) => p.status === 'completed').length;
+  const currentLesson = lessons.find((l) => progress[l.id]?.status !== 'completed');
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="animate-spin text-blue-600" size={40} />
+        <Loader2 className="animate-spin text-indigo-400" size={40} />
       </div>
     );
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
+    <div className="max-w-2xl mx-auto px-4 py-8">
 
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">
+        <h1 className="text-2xl font-bold text-white mb-1">
           Salom, {(user?.full_name || user?.username || 'O\'quvchi').split(' ')[0]}! 👋
         </h1>
-        <p className="text-gray-500 mb-4">Bugun qaysi darsni o'rganamiz?</p>
+        <p className="text-slate-400 mb-4">
+          {currentLesson
+            ? 'Keyingi darsingiz tayyor — boshlaymizmi?'
+            : completedCount > 0
+              ? 'Barcha mavjud darslarni yakunladingiz!'
+              : 'Birinchi darsdan boshlang'}
+        </p>
 
-        {/* XP / Streak / Badge panel */}
         <div className="flex gap-3 flex-wrap">
-          {/* XP */}
-          <div className="flex items-center gap-2 bg-violet-50 text-violet-700 px-3 py-1.5 rounded-full text-sm font-semibold border border-violet-100">
+          <div className="flex items-center gap-2 bg-violet-500/15 text-violet-300 px-3 py-1.5 rounded-full text-sm font-semibold border border-violet-500/25">
             <Zap size={14} className="text-violet-500" />
             {xp} XP
           </div>
-
-          {/* Streak */}
           {streak > 0 && (
-            <div className="flex items-center gap-2 bg-orange-50 text-orange-700 px-3 py-1.5 rounded-full text-sm font-semibold border border-orange-100">
+            <div className="flex items-center gap-2 bg-orange-500/15 text-orange-300 px-3 py-1.5 rounded-full text-sm font-semibold border border-orange-500/25">
               <Flame size={14} className="text-orange-500" />
               {streak} kunlik seria
             </div>
           )}
-
-          {/* Completed */}
           {completedCount > 0 && (
-            <div className="flex items-center gap-2 bg-green-50 text-green-700 px-3 py-1.5 rounded-full text-sm font-semibold border border-green-100">
+            <div className="flex items-center gap-2 bg-emerald-500/15 text-emerald-300 px-3 py-1.5 rounded-full text-sm font-semibold border border-emerald-500/25">
               <CheckCircle size={14} />
               {completedCount} yakunlandi
             </div>
           )}
-
-          {/* In progress */}
-          {Object.keys(progress).length - completedCount > 0 && (
-            <div className="flex items-center gap-2 bg-yellow-50 text-yellow-700 px-3 py-1.5 rounded-full text-sm font-semibold border border-yellow-100">
-              <Clock size={14} />
-              {Object.keys(progress).length - completedCount} jarayonda
-            </div>
-          )}
         </div>
 
-        {/* Badges */}
         {badges.length > 0 && (
           <div className="flex gap-2 mt-3 flex-wrap">
-            {badges.map(b => (
+            {badges.map((b) => (
               <span
                 key={b.id}
                 title={b.desc}
-                className="inline-flex items-center gap-1.5 bg-white border border-gray-200 text-gray-700 text-xs font-semibold px-2.5 py-1 rounded-full shadow-sm cursor-default"
+                className="inline-flex items-center gap-1.5 bg-surface-100 border border-border text-slate-300 text-xs font-semibold px-2.5 py-1 rounded-full cursor-default"
               >
                 {b.emoji} {b.label}
               </span>
@@ -134,202 +94,131 @@ export default function DashboardPage() {
       </div>
 
       {/* Search */}
-      <div className="relative mb-6">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Dars qidirish..."
-          className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white shadow-sm"
-        />
-      </div>
-
-      {/* Category pills */}
-      {categories.length > 0 && (
-        <div className="flex gap-2 flex-wrap mb-8">
-          <button
-            onClick={() => setSelectedCategory('')}
-            className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${
-              !selectedCategory
-                ? 'bg-gray-900 text-white shadow-sm'
-                : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
-            }`}
-          >
-            Hammasi
-          </button>
-          {categories.map((c) => {
-            const theme = getTheme(c.id);
-            const active = selectedCategory === String(c.id);
-            return (
-              <button
-                key={c.id}
-                onClick={() => setSelectedCategory(active ? '' : String(c.id))}
-                className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all flex items-center gap-1.5 ${
-                  active
-                    ? `bg-gradient-to-r ${theme.gradient} text-white shadow-sm scale-105`
-                    : `${theme.pill} hover:scale-105`
-                }`}
-              >
-                <span>{theme.emoji}</span>
-                {c.name}
-                <span className={`text-xs px-1.5 py-0.5 rounded-full ${active ? 'bg-white/20' : 'bg-white/60'}`}>
-                  {c.lesson_count}
-                </span>
-              </button>
-            );
-          })}
+      {lessons.length > 3 && (
+        <div className="relative mb-6">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Dars qidirish..."
+            className="admin-input pl-10"
+          />
         </div>
       )}
 
-      {/* Level filter */}
-      {levels.length > 0 && (
-        <div className="flex gap-2 flex-wrap mb-6">
-          <button
-            onClick={() => setSelectedLevel('')}
-            className={`px-3 py-1 rounded-full text-xs font-semibold transition-all border ${
-              !selectedLevel
-                ? 'bg-gray-900 text-white border-gray-900'
-                : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'
-            }`}
-          >
-            Barcha daraja
-          </button>
-          {levels.map((lvl) => (
-            <button
-              key={lvl.slug}
-              onClick={() => setSelectedLevel(selectedLevel === lvl.slug ? '' : lvl.slug)}
-              className={`px-3 py-1 rounded-full text-xs font-semibold transition-all border ${
-                selectedLevel === lvl.slug
-                  ? 'bg-gray-900 text-white border-gray-900'
-                  : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'
-              }`}
-            >
-              {lvl.name}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Lessons Grid */}
+      {/* Lesson path */}
       {filtered.length === 0 ? (
         <div className="text-center py-20">
           <div className="text-6xl mb-4">🔍</div>
-          <p className="text-gray-500 text-lg font-medium">Dars topilmadi</p>
-          <p className="text-gray-400 text-sm mt-1">Boshqa kalit so'z yoki kategoriya tanlang</p>
+          <p className="text-slate-300 text-lg font-medium">Dars topilmadi</p>
         </div>
       ) : (
-        <>
-          <p className="text-sm text-gray-400 mb-4">{filtered.length} ta dars</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {filtered.map((lesson) => (
-              <LessonCard
-                key={lesson.id}
-                lesson={lesson}
-                progress={progress[lesson.id]}
-                onClick={() => navigate(`/lessons/${lesson.id}`)}
-              />
-            ))}
-          </div>
-        </>
+        <div className="space-y-3">
+          {filtered.map((lesson, idx) => (
+            <LessonRow
+              key={lesson.id}
+              lesson={lesson}
+              progress={progress[lesson.id]}
+              isCurrent={lesson.id === currentLesson?.id}
+              isLast={idx === filtered.length - 1}
+              onClick={() => navigate(`/lessons/${lesson.id}`)}
+            />
+          ))}
+        </div>
       )}
     </div>
   );
 }
 
-function LessonCard({ lesson, progress, onClick }) {
-  const theme = getTheme(lesson.category);
-  const isLocked = lesson.is_locked;
+function LessonRow({ lesson, progress, isCurrent, isLast, onClick }) {
   const isCompleted = progress?.status === 'completed';
   const isInProgress = progress?.status === 'in-progress';
   const score = progress?.score || 0;
+  const unitNum = getUnitNumber(lesson.title);
+  const title = formatLessonTitle(lesson.title);
 
   return (
-    <div
-      onClick={isLocked ? undefined : onClick}
-      className={`group bg-white rounded-2xl border shadow-sm transition-all duration-300 overflow-hidden
-        ${isLocked
-          ? 'border-gray-200 opacity-60 cursor-not-allowed'
-          : 'border-gray-100 hover:shadow-xl cursor-pointer hover:-translate-y-1'
-        }`}
-    >
-      {/* Top banner */}
-      <div className={`bg-gradient-to-br ${theme.gradient} h-24 relative flex items-center justify-center
-        ${isLocked ? 'brightness-75' : ''}`}>
-        <span className="text-5xl drop-shadow-sm select-none">{theme.emoji}</span>
-        {isLocked && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-t-2xl">
-            <Lock size={28} className="text-white drop-shadow" />
-          </div>
-        )}
-        {!isLocked && isCompleted && (
-          <div className="absolute top-2 right-2 bg-white/90 rounded-full p-1 shadow-sm">
-            <CheckCircle size={16} className="text-green-500" />
-          </div>
-        )}
-        {!isLocked && isInProgress && (
-          <div className="absolute top-2 right-2 bg-white/90 rounded-full p-1 shadow-sm">
-            <Clock size={16} className="text-yellow-500" />
-          </div>
+    <div className="flex gap-4">
+      {/* Timeline */}
+      <div className="flex flex-col items-center shrink-0 w-8">
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+          isCompleted
+            ? 'bg-emerald-500/20 text-emerald-400 border-2 border-emerald-500/40'
+            : isCurrent
+              ? 'bg-indigo-500 text-white border-2 border-indigo-400 shadow-lg shadow-indigo-500/30'
+              : 'bg-surface-200 text-slate-400 border-2 border-border'
+        }`}>
+          {isCompleted ? <CheckCircle size={16} /> : unitNum ?? '·'}
+        </div>
+        {!isLast && (
+          <div className={`w-0.5 flex-1 min-h-[12px] mt-1 ${
+            isCompleted ? 'bg-emerald-500/30' : 'bg-border'
+          }`} />
         )}
       </div>
 
-      <div className="p-4">
-        {/* Category + level badges */}
-        <div className="flex items-center gap-1.5 flex-wrap mb-2">
-          <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${theme.pill}`}>
-            {lesson.category_name || 'Umumiy'}
-          </span>
-          {lesson.levels?.map((lv) => (
-            <span key={lv.slug} className="text-xs font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
-              {lv.name}
-            </span>
-          ))}
+      {/* Card */}
+      <button
+        onClick={onClick}
+        className={`flex-1 text-left student-card p-4 mb-1 transition-all duration-200 hover:-translate-y-0.5 ${
+          isCurrent ? 'border-indigo-500/40 ring-1 ring-indigo-500/20' : ''
+        }`}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              {isCurrent && (
+                <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-400 bg-indigo-500/15 px-2 py-0.5 rounded-full">
+                  Hozirgi dars
+                </span>
+              )}
+              {isCompleted && (
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/15 px-2 py-0.5 rounded-full">
+                  Yakunlandi
+                </span>
+              )}
+              {isInProgress && !isCurrent && (
+                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 bg-amber-500/15 px-2 py-0.5 rounded-full">
+                  Jarayonda
+                </span>
+              )}
+            </div>
+            <h3 className="font-bold text-white text-base leading-snug truncate">{title}</h3>
+          </div>
+          <ChevronRight size={18} className="text-slate-500 shrink-0" />
         </div>
 
-        {/* Title */}
-        <h3 className="font-bold text-gray-900 group-hover:text-blue-700 transition line-clamp-2 text-base leading-snug mb-1">
-          {lesson.title}
-        </h3>
-
-        {lesson.description && (
-          <p className="text-sm text-gray-500 line-clamp-2 mb-3">{lesson.description}</p>
-        )}
-
-        {/* Progress / Lock state */}
-        {isLocked ? (
-          <div className="flex items-center gap-1.5 text-xs text-gray-400 mt-auto">
-            <Lock size={12} />
-            Oldingi darsni yakunlang
-          </div>
-        ) : progress ? (
-          <div className="mt-auto">
+        {progress && (
+          <div className="mt-3">
             <div className="flex items-center justify-between mb-1">
-              <span className="text-xs text-gray-500 font-medium">
-                {isCompleted ? 'Yakunlandi' : 'Jarayonda'}
+              <span className="text-xs text-slate-500">
+                {isCompleted ? 'Natija' : 'Jarayon'}
               </span>
-              <span className={`text-xs font-bold ${isCompleted ? 'text-green-600' : 'text-yellow-600'}`}>
+              <span className={`text-xs font-bold ${isCompleted ? 'text-emerald-400' : 'text-amber-400'}`}>
                 {score}%
               </span>
             </div>
-            <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+            <div className="w-full bg-surface-200 rounded-full h-1.5 overflow-hidden">
               <div
-                className={`h-2 rounded-full transition-all duration-500 ${
+                className={`h-1.5 rounded-full transition-all duration-500 ${
                   isCompleted
-                    ? 'bg-gradient-to-r from-green-400 to-emerald-500'
-                    : 'bg-gradient-to-r from-yellow-400 to-orange-400'
+                    ? 'bg-gradient-to-r from-emerald-400 to-green-500'
+                    : 'bg-gradient-to-r from-amber-400 to-orange-400'
                 }`}
                 style={{ width: `${score}%` }}
               />
             </div>
           </div>
-        ) : (
-          <div className="flex items-center gap-1 text-xs text-gray-400 mt-auto">
-            <BookOpen size={12} />
-            Boshlash uchun bosing
-          </div>
         )}
-      </div>
+
+        {isCurrent && !progress && (
+          <p className="text-xs text-indigo-400 mt-2 flex items-center gap-1">
+            <Clock size={12} />
+            Boshlash uchun bosing
+          </p>
+        )}
+      </button>
     </div>
   );
 }

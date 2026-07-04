@@ -5,13 +5,13 @@ import { ArrowLeft, Send, Trash2, Loader2, CheckCircle, XCircle } from 'lucide-r
 import { useAuth } from '../context/AuthContext';
 import ExerciseBlock from '../components/exercises/ExerciseBlock';
 import VocabStudy from '../components/vocab/VocabStudy';
+import { formatLessonTitle, formatLessonDescription } from '../utils/lessonDisplay';
 
 function getYoutubeId(url) {
   const match = url?.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/))([^&?/\s]{11})/);
   return match ? match[1] : null;
 }
 
-/* ── Confetti ──────────────────────────────────────────────────────── */
 function Confetti() {
   const colors = ['#6366f1','#06b6d4','#10b981','#f59e0b','#ec4899','#f97316'];
   const pieces = Array.from({ length: 48 }, (_, i) => ({
@@ -46,38 +46,36 @@ function Confetti() {
   );
 }
 
-/* ── Section sarlavhasi ─────────────────────────────────────────────── */
 function SectionTitle({ emoji, title, sub }) {
   return (
     <div className="flex items-center gap-3 mb-5">
-      <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center text-2xl shrink-0">
+      <div className="w-10 h-10 rounded-xl bg-surface-200 border border-border flex items-center justify-center text-2xl shrink-0">
         {emoji}
       </div>
       <div>
-        <h2 className="text-lg font-extrabold text-gray-900">{title}</h2>
-        {sub && <p className="text-sm text-gray-400">{sub}</p>}
+        <h2 className="student-section-title">{title}</h2>
+        {sub && <p className="student-section-sub">{sub}</p>}
       </div>
     </div>
   );
 }
 
-/* ── Quiz natija baneri ─────────────────────────────────────────────── */
 function QuizResultBanner({ result }) {
   const great = result.score >= 80;
   const ok    = result.score >= 60;
   return (
     <div className={`relative overflow-hidden mb-6 p-5 rounded-2xl border-2 text-center ${
-      great ? 'bg-green-50 border-green-300' :
-      ok    ? 'bg-yellow-50 border-yellow-300' :
-              'bg-red-50 border-red-200'
+      great ? 'bg-emerald-500/10 border-emerald-500/40' :
+      ok    ? 'bg-amber-500/10 border-amber-500/40' :
+              'bg-red-500/10 border-red-500/30'
     }`}>
       {great && <Confetti />}
       <div className="text-5xl mb-2">{great ? '🏆' : ok ? '⭐' : '💪'}</div>
-      <p className="text-3xl font-extrabold text-gray-900">{result.score}%</p>
-      <p className="text-base font-semibold text-gray-700 mt-1">
+      <p className="text-3xl font-extrabold text-white">{result.score}%</p>
+      <p className="text-base font-semibold text-slate-300 mt-1">
         {result.correct}/{result.total} ta to'g'ri
       </p>
-      <p className={`text-sm mt-2 font-medium ${great ? 'text-green-700' : ok ? 'text-yellow-700' : 'text-red-600'}`}>
+      <p className={`text-sm mt-2 font-medium ${great ? 'text-emerald-400' : ok ? 'text-amber-400' : 'text-red-400'}`}>
         {great ? '🎉 Ajoyib! Dars muvaffaqiyatli yakunlandi!' :
          ok    ? '👍 Yaxshi natija! Dars yakunlandi.' :
                  '😅 Qayta urinib ko\'ring — siz uddalaysiz!'}
@@ -102,7 +100,7 @@ export default function LessonPage() {
   const [comment, setComment]     = useState('');
   const [loading, setLoading]     = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [answerAnim, setAnswerAnim] = useState({});  // quizId → 'correct'|'wrong'
+  const [answerAnim, setAnswerAnim] = useState({});
   const quizRef = useRef(null);
 
   useEffect(() => {
@@ -114,7 +112,7 @@ export default function LessonPage() {
       api.get(`/comments/?lesson=${id}`),
     ]).then(([l, v, q, ex, c]) => {
       if (l.data.is_locked) {
-        navigate('/', { replace: true });
+        navigate('/dashboard', { replace: true });
         return;
       }
       setLesson(l.data);
@@ -123,8 +121,10 @@ export default function LessonPage() {
       setExercises(ex.data);
       setComments(c.data);
       api.post('/courses/progress/', { lesson: Number(id), status: 'in-progress' }).catch(() => {});
+    }).catch(() => {
+      navigate('/dashboard', { replace: true });
     }).finally(() => setLoading(false));
-  }, [id]);
+  }, [id, navigate]);
 
   const handleAnswer = (quizId, idx) => {
     if (submitted) return;
@@ -143,7 +143,6 @@ export default function LessonPage() {
     };
     try {
       const { data } = await api.post('/quiz/submit/', payload);
-      // Animate each answer
       const anim = {};
       data.results?.forEach((r) => {
         anim[r.quiz_id] = r.is_correct ? 'correct' : 'wrong';
@@ -172,44 +171,38 @@ export default function LessonPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="animate-spin text-blue-600" size={40} />
+        <Loader2 className="animate-spin text-indigo-400" size={40} />
       </div>
     );
   }
-  if (!lesson) return <div className="text-center py-20 text-gray-400">Dars topilmadi</div>;
+  if (!lesson) return <div className="text-center py-20 text-slate-500">Dars topilmadi</div>;
 
   const ytId = getYoutubeId(lesson.video_url);
+  const displayTitle = formatLessonTitle(lesson.title);
+  const displayDesc = formatLessonDescription(lesson.description);
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
 
-      {/* Back */}
       <button
-        onClick={() => navigate(-1)}
-        className="flex items-center gap-2 text-gray-500 hover:text-blue-600 transition mb-6 font-medium"
+        onClick={() => navigate('/dashboard')}
+        className="flex items-center gap-2 text-slate-500 hover:text-indigo-400 transition mb-6 font-medium"
       >
         <ArrowLeft size={18} /> Orqaga
       </button>
 
-      {/* Title */}
       <div className="mb-6">
-        <h1 className="text-3xl font-extrabold text-gray-900 leading-tight mb-3">{lesson.title}</h1>
-        {lesson.category_name && (
-          <span className="inline-block text-sm font-semibold bg-violet-100 text-violet-700 px-3 py-1 rounded-full">
-            📂 {lesson.category_name}
-          </span>
-        )}
+        <h1 className="text-3xl font-extrabold text-white leading-tight">{displayTitle}</h1>
       </div>
 
-      {/* ── Video ───────────────────────────────── */}
       <section className="mb-8">
         <SectionTitle emoji="🎬" title="Video dars" />
-        <div className="rounded-2xl overflow-hidden shadow-xl aspect-video bg-black">
+        <div className="rounded-2xl overflow-hidden shadow-xl aspect-video bg-black border border-border">
           {ytId ? (
             <iframe
               className="w-full h-full"
               src={`https://www.youtube.com/embed/${ytId}`}
-              title={lesson.title}
+              title={displayTitle}
               allowFullScreen
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             />
@@ -219,27 +212,24 @@ export default function LessonPage() {
         </div>
       </section>
 
-      {/* ── Description ─────────────────────────── */}
-      {lesson.description && (
+      {displayDesc && (
         <section className="mb-8">
           <SectionTitle emoji="📖" title="Dars haqida" />
-          <div className="bg-blue-50 border border-blue-100 rounded-2xl p-6">
-            <p className="text-gray-700 leading-relaxed text-base">{lesson.description}</p>
+          <div className="student-panel">
+            <p className="text-slate-300 leading-relaxed text-base">{displayDesc}</p>
           </div>
         </section>
       )}
 
-      {/* ── Vocabulary ──────────────────────────── */}
       {vocab.length > 0 && (
         <section className="mb-8">
           <SectionTitle emoji="💬" title="Yangi so'zlar" sub={`${vocab.length} ta so'z — 4 bosqichda o'rganing`} />
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+          <div className="student-panel">
             <VocabStudy words={vocab} />
           </div>
         </section>
       )}
 
-      {/* ── Exercises ───────────────────────────── */}
       {exercises.length > 0 && (
         <section className="mb-8">
           <SectionTitle emoji="✏️" title="Mashqlar" sub={`${exercises.length} ta mashq`} />
@@ -251,7 +241,6 @@ export default function LessonPage() {
         </section>
       )}
 
-      {/* ── Quiz ────────────────────────────────── */}
       {quizzes.length > 0 && (
         <section className="mb-8" ref={quizRef}>
           <SectionTitle emoji="📝" title="Test" sub={`${quizzes.length} ta savol`} />
@@ -265,21 +254,21 @@ export default function LessonPage() {
               return (
                 <div
                   key={quiz.id}
-                  className={`bg-white rounded-2xl border-2 shadow-sm p-5 transition-all duration-300 ${
-                    anim === 'correct' ? 'border-green-400 bg-green-50/40' :
-                    anim === 'wrong'   ? 'border-red-300 bg-red-50/30' :
-                                        'border-gray-100'
+                  className={`student-card p-5 border-2 transition-all duration-300 ${
+                    anim === 'correct' ? 'border-emerald-500/50' :
+                    anim === 'wrong'   ? 'border-red-500/40' :
+                                        'border-border'
                   }`}
                 >
                   <div className="flex items-start gap-3 mb-4">
                     <span className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold text-white ${
-                      anim === 'correct' ? 'bg-green-500' :
-                      anim === 'wrong'   ? 'bg-red-400' :
-                                          'bg-gray-300'
+                      anim === 'correct' ? 'bg-emerald-500' :
+                      anim === 'wrong'   ? 'bg-red-500' :
+                                          'bg-surface-300'
                     }`}>
                       {qi + 1}
                     </span>
-                    <p className="font-semibold text-gray-900 text-base leading-snug">{quiz.question}</p>
+                    <p className="font-semibold text-white text-base leading-snug">{quiz.question}</p>
                   </div>
 
                   <div className="space-y-2 pl-10">
@@ -288,21 +277,21 @@ export default function LessonPage() {
                       const isCorrect  = result && idx === result.correct_option_index;
                       const isWrong    = result && isSelected && !result.is_correct;
 
-                      let cls = 'border-gray-200 text-gray-700 hover:border-blue-400 hover:bg-blue-50';
-                      if (!submitted && isSelected) cls = 'border-blue-500 bg-blue-50 text-blue-800';
-                      if (submitted && isCorrect)   cls = 'border-green-500 bg-green-50 text-green-800';
-                      if (submitted && isWrong)     cls = 'border-red-400 bg-red-50 text-red-800';
+                      let cls = 'student-quiz-option';
+                      if (!submitted && isSelected) cls += ' selected';
+                      if (submitted && isCorrect)   cls += ' correct';
+                      if (submitted && isWrong)     cls += ' wrong';
 
                       return (
                         <button
                           key={idx}
                           onClick={() => handleAnswer(quiz.id, idx)}
                           disabled={submitted}
-                          className={`w-full text-left px-4 py-3 rounded-xl border-2 transition-all duration-200 flex items-center gap-3 font-medium ${cls}`}
+                          className={cls}
                         >
-                          {submitted && isCorrect && <CheckCircle size={16} className="text-green-600 shrink-0" />}
-                          {submitted && isWrong   && <XCircle    size={16} className="text-red-500 shrink-0" />}
-                          <span className="text-sm">{String.fromCharCode(65 + idx)}. {opt}</span>
+                          {submitted && isCorrect && <CheckCircle size={16} className="text-emerald-400 shrink-0" />}
+                          {submitted && isWrong   && <XCircle    size={16} className="text-red-400 shrink-0" />}
+                          <span>{String.fromCharCode(65 + idx)}. {opt}</span>
                         </button>
                       );
                     })}
@@ -316,7 +305,7 @@ export default function LessonPage() {
             <button
               onClick={handleSubmitQuiz}
               disabled={submitting || Object.keys(answers).length !== quizzes.length}
-              className="mt-6 w-full sm:w-auto bg-gradient-to-r from-blue-500 to-violet-600 hover:from-blue-600 hover:to-violet-700 disabled:opacity-50 text-white font-bold px-8 py-3.5 rounded-2xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-200"
+              className="mt-6 w-full sm:w-auto admin-btn-primary px-8 py-3.5 disabled:opacity-50"
             >
               {submitting
                 ? <><Loader2 className="animate-spin" size={18} /> Tekshirilmoqda...</>
@@ -327,7 +316,6 @@ export default function LessonPage() {
         </section>
       )}
 
-      {/* ── Comments ────────────────────────────── */}
       <section>
         <SectionTitle emoji="💭" title="Izohlar" sub={`${comments.length} ta izoh`} />
 
@@ -337,12 +325,12 @@ export default function LessonPage() {
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             placeholder="Savol yoki izoh yozing..."
-            className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white text-sm"
+            className="student-input"
           />
           <button
             type="submit"
             disabled={!comment.trim()}
-            className="bg-gradient-to-r from-blue-500 to-violet-600 disabled:opacity-40 text-white px-5 py-3 rounded-xl transition flex items-center gap-2 font-semibold"
+            className="admin-btn-primary disabled:opacity-40"
           >
             <Send size={16} />
             <span className="hidden sm:inline">Yuborish</span>
@@ -350,32 +338,32 @@ export default function LessonPage() {
         </form>
 
         {comments.length === 0 ? (
-          <div className="text-center py-10 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+          <div className="text-center py-10 student-panel border-dashed">
             <div className="text-4xl mb-2">💬</div>
-            <p className="text-gray-400 text-sm">Hali izoh yo'q — birinchi bo'ling!</p>
+            <p className="text-slate-500 text-sm">Hali izoh yo'q — birinchi bo'ling!</p>
           </div>
         ) : (
           <div className="space-y-3">
             {comments.map((c) => (
-              <div key={c.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex gap-3">
-                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-400 to-blue-500 flex items-center justify-center text-white font-bold text-sm shrink-0">
+              <div key={c.id} className="student-card p-4 flex gap-3">
+                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-400 to-indigo-500 flex items-center justify-center text-white font-bold text-sm shrink-0">
                   {(c.user_name || c.user_username || '?')[0].toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-semibold text-gray-800">
+                    <p className="text-sm font-semibold text-slate-200">
                       {c.user_name || `@${c.user_username}`}
                     </p>
                     <div className="flex items-center gap-2 shrink-0">
-                      <p className="text-xs text-gray-400">{new Date(c.created_at).toLocaleString('uz-UZ')}</p>
+                      <p className="text-xs text-slate-500">{new Date(c.created_at).toLocaleString('uz-UZ')}</p>
                       {(user?.role === 'admin' || user?.id === c.user) && (
-                        <button onClick={() => deleteComment(c.id)} className="text-gray-300 hover:text-red-500 transition">
+                        <button onClick={() => deleteComment(c.id)} className="text-slate-600 hover:text-red-400 transition">
                           <Trash2 size={14} />
                         </button>
                       )}
                     </div>
                   </div>
-                  <p className="text-gray-600 mt-1 text-sm leading-relaxed">{c.message}</p>
+                  <p className="text-slate-400 mt-1 text-sm leading-relaxed">{c.message}</p>
                 </div>
               </div>
             ))}

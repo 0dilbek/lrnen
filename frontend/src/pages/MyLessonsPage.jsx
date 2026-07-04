@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
 import { Loader2, CheckCircle, Clock, ArrowRight } from 'lucide-react';
+import { formatLessonTitle } from '../utils/lessonDisplay';
 
 const MOTIVATIONAL = [
   { min: 0,  max: 0,  msg: "Hali hech narsa yo'q — bugun birinchi darsni boshlang! 🚀", emoji: '🚀' },
@@ -29,7 +30,7 @@ export default function MyLessonsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="animate-spin text-blue-600" size={40} />
+        <Loader2 className="animate-spin text-indigo-400" size={40} />
       </div>
     );
   }
@@ -39,47 +40,44 @@ export default function MyLessonsPage() {
   const motivation = getMotivation(progress.length);
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold text-gray-900 mb-1">Darslarim</h1>
-      <p className="text-gray-500 mb-6">Boshlagan va yakunlagan darslaringiz</p>
+    <div className="max-w-2xl mx-auto px-4 py-8">
+      <h1 className="text-2xl font-bold text-white mb-1">Darslarim</h1>
+      <p className="text-slate-400 mb-6">Boshlagan va yakunlagan darslaringiz</p>
 
-      {/* Motivatsion banner */}
-      <div className="bg-gradient-to-r from-blue-500 to-violet-600 rounded-2xl p-5 mb-8 text-white flex items-center gap-4 shadow-lg shadow-blue-200">
+      <div className="bg-gradient-to-r from-indigo-600 to-violet-600 rounded-2xl p-5 mb-8 text-white flex items-center gap-4 shadow-lg shadow-indigo-500/20">
         <span className="text-4xl">{motivation.emoji}</span>
         <p className="font-semibold text-lg">{motivation.msg}</p>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-2 gap-4 mb-8">
-        <div className="bg-green-50 border border-green-100 rounded-2xl p-5 flex items-center gap-4">
-          <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
-            <CheckCircle className="text-green-600" size={24} />
+        <div className="student-card p-5 flex items-center gap-4">
+          <div className="w-12 h-12 bg-emerald-500/15 rounded-xl flex items-center justify-center">
+            <CheckCircle className="text-emerald-400" size={24} />
           </div>
           <div>
-            <p className="text-3xl font-extrabold text-green-700">{completed.length}</p>
-            <p className="text-sm text-green-600 font-medium">Yakunlangan</p>
+            <p className="text-3xl font-extrabold text-emerald-400">{completed.length}</p>
+            <p className="text-sm text-slate-400 font-medium">Yakunlangan</p>
           </div>
         </div>
-        <div className="bg-yellow-50 border border-yellow-100 rounded-2xl p-5 flex items-center gap-4">
-          <div className="w-12 h-12 bg-yellow-100 rounded-xl flex items-center justify-center">
-            <Clock className="text-yellow-600" size={24} />
+        <div className="student-card p-5 flex items-center gap-4">
+          <div className="w-12 h-12 bg-amber-500/15 rounded-xl flex items-center justify-center">
+            <Clock className="text-amber-400" size={24} />
           </div>
           <div>
-            <p className="text-3xl font-extrabold text-yellow-700">{inProgress.length}</p>
-            <p className="text-sm text-yellow-600 font-medium">Jarayonda</p>
+            <p className="text-3xl font-extrabold text-amber-400">{inProgress.length}</p>
+            <p className="text-sm text-slate-400 font-medium">Jarayonda</p>
           </div>
         </div>
       </div>
 
-      {/* Empty state */}
       {progress.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-2xl border border-gray-100 shadow-sm">
+        <div className="text-center py-16 student-card">
           <div className="text-6xl mb-4">📖</div>
-          <p className="text-xl font-bold text-gray-800 mb-2">Hali hech qaysi dars boshlanmagan</p>
-          <p className="text-gray-400 mb-6">Bugun birinchi darsni boshlang va ingliz tilini o'rganing!</p>
+          <p className="text-xl font-bold text-white mb-2">Hali hech qaysi dars boshlanmagan</p>
+          <p className="text-slate-500 mb-6">Bugun birinchi darsni boshlang!</p>
           <button
             onClick={() => navigate('/dashboard')}
-            className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-500 to-violet-600 text-white px-6 py-3 rounded-2xl font-semibold hover:shadow-lg transition-all hover:-translate-y-0.5 shadow-md shadow-blue-200"
+            className="inline-flex items-center gap-2 admin-btn-primary px-6 py-3"
           >
             Darslarni ko'rish <ArrowRight size={16} />
           </button>
@@ -92,40 +90,40 @@ export default function MyLessonsPage() {
               <div
                 key={p.id}
                 onClick={() => navigate(`/lessons/${p.lesson}`)}
-                className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center gap-4 cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
+                className="student-card p-5 flex items-center gap-4 cursor-pointer hover:-translate-y-0.5 transition-all duration-200"
               >
                 <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${
-                  isDone ? 'bg-green-100' : 'bg-yellow-100'
+                  isDone ? 'bg-emerald-500/15' : 'bg-amber-500/15'
                 }`}>
                   {isDone
-                    ? <CheckCircle className="text-green-600" size={22} />
-                    : <Clock className="text-yellow-600" size={22} />
+                    ? <CheckCircle className="text-emerald-400" size={22} />
+                    : <Clock className="text-amber-400" size={22} />
                   }
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-gray-900 truncate">{p.lesson_title}</p>
+                  <p className="font-semibold text-white truncate">{formatLessonTitle(p.lesson_title)}</p>
                   <div className="flex items-center gap-3 mt-2">
-                    <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
+                    <div className="flex-1 bg-surface-200 rounded-full h-2 overflow-hidden">
                       <div
                         className={`h-2 rounded-full transition-all duration-700 ${
                           isDone
-                            ? 'bg-gradient-to-r from-green-400 to-emerald-500'
-                            : 'bg-gradient-to-r from-yellow-400 to-orange-400'
+                            ? 'bg-gradient-to-r from-emerald-400 to-green-500'
+                            : 'bg-gradient-to-r from-amber-400 to-orange-400'
                         }`}
                         style={{ width: `${p.score || 0}%` }}
                       />
                     </div>
-                    <span className={`text-xs font-bold shrink-0 ${isDone ? 'text-green-600' : 'text-yellow-600'}`}>
+                    <span className={`text-xs font-bold shrink-0 ${isDone ? 'text-emerald-400' : 'text-amber-400'}`}>
                       {p.score || 0}%
                     </span>
                   </div>
                 </div>
 
                 <span className={`text-xs px-3 py-1.5 rounded-full font-semibold shrink-0 ${
-                  isDone ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                  isDone ? 'bg-emerald-500/15 text-emerald-400' : 'bg-amber-500/15 text-amber-400'
                 }`}>
-                  {isDone ? '✅ Yakunlandi' : '⏳ Jarayonda'}
+                  {isDone ? 'Yakunlandi' : 'Jarayonda'}
                 </span>
               </div>
             );

@@ -9,27 +9,27 @@ const TYPE_META = {
   choose_correct: {
     label: "To'g'ri so'zni tanlash",
     icon: MousePointer,
-    color: 'text-purple-600 bg-purple-50 border-purple-200',
+    color: 'text-purple-300 bg-purple-500/15 border-purple-500/30',
   },
   fill_blank: {
     label: "Bo'sh joy to'ldirish",
     icon: PenLine,
-    color: 'text-blue-600 bg-blue-50 border-blue-200',
+    color: 'text-blue-300 bg-blue-500/15 border-blue-500/30',
   },
   matching: {
     label: 'Moslashtirish',
     icon: GitMerge,
-    color: 'text-orange-600 bg-orange-50 border-orange-200',
+    color: 'text-orange-300 bg-orange-500/15 border-orange-500/30',
   },
   listening: {
     label: 'Listening',
     icon: Headphones,
-    color: 'text-teal-600 bg-teal-50 border-teal-200',
+    color: 'text-teal-300 bg-teal-500/15 border-teal-500/30',
   },
   speaking: {
     label: 'Speaking',
     icon: Mic,
-    color: 'text-rose-600 bg-rose-50 border-rose-200',
+    color: 'text-rose-300 bg-rose-500/15 border-rose-500/30',
   },
 };
 
@@ -40,7 +40,7 @@ export default function ExerciseBlock({ exercise, index }) {
   const meta = TYPE_META[exercise.type] || {
     label: exercise.type,
     icon: PenLine,
-    color: 'text-gray-600 bg-gray-50 border-gray-200',
+    color: 'text-slate-400 bg-surface-200 border-border',
   };
   const Icon = meta.icon;
 
@@ -56,28 +56,28 @@ export default function ExerciseBlock({ exercise, index }) {
   }[exercise.type];
 
   return (
-    <div className="border border-gray-200 rounded-2xl overflow-hidden bg-white shadow-sm">
+    <div className="student-card overflow-hidden">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center gap-3 px-5 py-4 hover:bg-gray-50 transition text-left"
+        className="w-full flex items-center gap-3 px-5 py-4 hover:bg-surface-200/40 transition text-left"
       >
         <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-semibold ${meta.color}`}>
           <Icon size={13} />
           {meta.label}
         </span>
-        <span className="text-sm text-gray-700 font-medium flex-1">{exercise.instruction}</span>
+        <span className="text-sm text-slate-300 font-medium flex-1">{exercise.instruction}</span>
         {result && (
           <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-            result.correct === result.total ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-600'
+            result.correct === result.total ? 'bg-emerald-500/15 text-emerald-400' : 'bg-orange-500/15 text-orange-400'
           }`}>
             {result.correct}/{result.total}
           </span>
         )}
-        {open ? <ChevronUp size={16} className="text-gray-400 shrink-0" /> : <ChevronDown size={16} className="text-gray-400 shrink-0" />}
+        {open ? <ChevronUp size={16} className="text-slate-500 shrink-0" /> : <ChevronDown size={16} className="text-slate-500 shrink-0" />}
       </button>
 
       {open && Component && (
-        <div className="px-5 pb-5 border-t border-gray-100 pt-4">
+        <div className="px-5 pb-5 border-t border-border pt-4">
           <Component exercise={exercise} onComplete={handleComplete} />
         </div>
       )}

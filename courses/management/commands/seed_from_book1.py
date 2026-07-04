@@ -146,6 +146,8 @@ class Command(BaseCommand):
                             help='Progress holatini ko\'rsatadi va chiqadi')
         parser.add_argument('--delay', type=float, default=3.0,
                             help='Sahifalar orasidagi kutish (soniya, default: 3)')
+        parser.add_argument('--retry-skipped', action='store_true',
+                            help='Avval o\'tkazib yuborilgan (skipped) sahifalarni qayta ishlaydi')
 
     def handle(self, *args, **options):
         from decouple import config as env
@@ -203,9 +205,15 @@ class Command(BaseCommand):
 
         book_dir = os.path.join(settings.BASE_DIR, 'static', 'book')
 
+        retry_skipped = options.get('retry_skipped', False)
+
         for page_num in range(start_page, end_page + 1):
-            if str(page_num) in progress.get('done', {}):
+            prev_status = progress.get('done', {}).get(str(page_num))
+            if prev_status == 'ok':
                 self.stdout.write(f'  ⏭  Sahifa {page_num:3d} — allaqachon bajarilgan, o\'tkazildi.')
+                continue
+            if prev_status == 'skipped' and not retry_skipped:
+                self.stdout.write(f'  ⏭  Sahifa {page_num:3d} — oldin skipped, o\'tkazildi.')
                 continue
 
             filename = BOOK_IMG_TPL.format(page_num)

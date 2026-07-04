@@ -4,6 +4,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import { GameProvider } from './context/GameContext';
 import Navbar from './components/Navbar';
 import MobileNav from './components/MobileNav';
+import AdminLayout from './components/admin/AdminLayout';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import LessonPage from './pages/LessonPage';
@@ -41,11 +42,19 @@ function PublicRoute({ children }) {
 
 function Layout({ children }) {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface">
       <Navbar />
       <main className="pb-16 sm:pb-0">{children}</main>
       <MobileNav />
     </div>
+  );
+}
+
+function AdminRoute({ children, title, subtitle }) {
+  return (
+    <PrivateRoute adminOnly>
+      <AdminLayout title={title} subtitle={subtitle}>{children}</AdminLayout>
+    </PrivateRoute>
   );
 }
 
@@ -77,16 +86,16 @@ export default function App() {
 
           {/* Admin routes */}
           <Route path="/admin" element={
-            <PrivateRoute adminOnly><Layout><AdminDashboard /></Layout></PrivateRoute>
+            <AdminRoute title="Dashboard" subtitle="Platformaning umumiy ko'rinishi"><AdminDashboard /></AdminRoute>
           } />
           <Route path="/admin/students" element={
-            <PrivateRoute adminOnly><Layout><AdminStudents /></Layout></PrivateRoute>
+            <AdminRoute title="O'quvchilar" subtitle="Ro'yxatdan o'tganlar va faollik"><AdminStudents /></AdminRoute>
           } />
           <Route path="/admin/students/:id" element={
-            <PrivateRoute adminOnly><Layout><AdminStudentDetail /></Layout></PrivateRoute>
+            <AdminRoute><AdminStudentDetail /></AdminRoute>
           } />
           <Route path="/admin/lessons" element={
-            <PrivateRoute adminOnly><Layout><AdminLessons /></Layout></PrivateRoute>
+            <AdminRoute title="Kontent boshqaruvi" subtitle="Darslar, mashqlar va lug'at"><AdminLessons /></AdminRoute>
           } />
 
           <Route path="*" element={<Navigate to="/login" replace />} />
