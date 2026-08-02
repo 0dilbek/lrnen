@@ -9,12 +9,12 @@ export default {
     extend: {
       colors: {
         surface: {
-          DEFAULT: '#0c1222',
-          50: '#111827',
-          100: '#151d2e',
-          200: '#1a2332',
-          300: '#243044',
-          400: '#2d3a50',
+          DEFAULT: 'rgb(var(--surface-rgb) / <alpha-value>)',
+          50: 'rgb(var(--surface-50-rgb) / <alpha-value>)',
+          100: 'rgb(var(--surface-100-rgb) / <alpha-value>)',
+          200: 'rgb(var(--surface-200-rgb) / <alpha-value>)',
+          300: 'rgb(var(--surface-300-rgb) / <alpha-value>)',
+          400: 'rgb(var(--surface-400-rgb) / <alpha-value>)',
         },
         accent: {
           DEFAULT: '#6366f1',
@@ -22,16 +22,16 @@ export default {
           muted: '#312e81',
         },
         border: {
-          DEFAULT: '#2a3548',
-          light: '#1e293b',
+          DEFAULT: 'rgb(var(--border-rgb) / <alpha-value>)',
+          light: 'rgb(var(--border-light-rgb) / <alpha-value>)',
         },
       },
       fontFamily: {
         sans: ['"DM Sans"', 'Inter', 'system-ui', 'sans-serif'],
       },
       boxShadow: {
-        'card': '0 1px 3px rgba(0,0,0,0.4), 0 4px 12px rgba(0,0,0,0.25)',
-        'card-hover': '0 4px 20px rgba(0,0,0,0.45), 0 0 0 1px rgba(99,102,241,0.15)',
+        'card': 'var(--shadow-card)',
+        'card-hover': 'var(--shadow-card-hover)',
       },
     },
   },

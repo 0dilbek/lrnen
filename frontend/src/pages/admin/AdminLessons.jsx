@@ -4,7 +4,8 @@ import {
   Plus, Pencil, Trash2, Loader2, BookOpen,
   X, Check,
   AlertTriangle, MousePointer, PenLine, GitMerge,
-  Headphones, Mic, Volume2,
+  Headphones, Mic, Volume2, BookMarked, Search, Music2,
+  ArrowUp, ArrowDown,
 } from 'lucide-react';
 
 const EXERCISE_TYPES = [
@@ -12,6 +13,7 @@ const EXERCISE_TYPES = [
   { value: 'fill_blank',     label: "Bo'sh joy to'ldirish",  icon: PenLine,       color: 'text-blue-300 bg-blue-500/15' },
   { value: 'matching',       label: 'Moslashtirish',          icon: GitMerge,      color: 'text-orange-300 bg-orange-500/15' },
   { value: 'listening',      label: 'Listening',              icon: Headphones,    color: 'text-teal-300 bg-teal-500/15' },
+  { value: 'reading',        label: 'Reading',                icon: BookMarked,    color: 'text-indigo-300 bg-indigo-500/15' },
   { value: 'speaking',       label: 'Speaking',               icon: Mic,           color: 'text-rose-300 bg-rose-500/15' },
 ];
 
@@ -151,7 +153,7 @@ export default function AdminLessons() {
                 }`}
               >
                 <div className="flex items-center gap-2">
-                  <p className={`text-sm font-medium truncate flex-1 ${active ? 'text-indigo-300' : 'text-slate-300'}`}>{cat.name}</p>
+                  <p className="text-sm font-medium truncate flex-1">{cat.name}</p>
                   <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 shrink-0">
                     <button onClick={(e) => { e.stopPropagation(); setModal({ type: 'category', data: cat }); }} className="admin-btn-ghost !p-1"><Pencil size={11} /></button>
                     <button onClick={(e) => { e.stopPropagation(); delCategory(cat); }} className="admin-btn-danger !p-1"><Trash2 size={11} /></button>
@@ -199,7 +201,7 @@ export default function AdminLessons() {
                       active ? 'active' : ''
                     }`}
                   >
-                    <p className={`text-sm font-medium truncate ${active ? 'text-white' : 'text-slate-300'}`}>{lesson.title}</p>
+                    <p className="text-sm font-medium truncate">{lesson.title}</p>
                     <p className="text-[10px] text-slate-500 mt-1 flex gap-1.5">
                       <span>{vCount} lug'at</span><span>·</span><span>{eCount} mashq</span><span>·</span><span>{qCount} test</span>
                     </p>
@@ -264,7 +266,7 @@ export default function AdminLessons() {
                       <div key={v.id} className="flex items-center gap-3 px-4 py-2.5 bg-surface-100 border border-border rounded-xl group">
                         <span className="text-sm font-semibold text-indigo-300 w-32 shrink-0">{v.word}</span>
                         <span className="text-slate-600">—</span>
-                        <span className="text-sm text-slate-300 flex-1">{v.translation}</span>
+                        <span className="text-sm admin-text-body flex-1">{v.translation}</span>
                         {v.example && <span className="text-xs text-slate-500 italic truncate max-w-xs hidden lg:block">"{v.example}"</span>}
                         <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 shrink-0">
                           <button onClick={() => setModal({ type: 'vocab', data: v })} className="admin-btn-ghost !p-1"><Pencil size={12} /></button>
@@ -293,7 +295,12 @@ export default function AdminLessons() {
                             <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium mb-1.5 ${meta?.color || 'text-slate-400 bg-surface-200'}`}>
                               <Icon size={10} />{meta?.label || ex.type}
                             </span>
-                            <p className="text-sm text-slate-300">{ex.instruction}</p>
+                            <p className="text-sm admin-text-body">{ex.instruction}</p>
+                            <div className="flex flex-wrap gap-2 mt-2 text-[10px] admin-text-muted">
+                              <span>Tartib: {ex.order}</span>
+                              {ex.type === 'reading' && <span className="text-indigo-500 font-bold">{ex.content?.pages?.length || 0} sahifa</span>}
+                              {ex.type === 'listening' && <span className={ex.audio_url ? 'text-emerald-500 font-bold' : 'text-amber-500 font-bold'}>{ex.audio_url ? 'Audio tayyor' : 'Audio tanlanmagan'}</span>}
+                            </div>
                           </div>
                           <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 shrink-0">
                             <button onClick={() => setModal({ type: 'exercise', data: ex })} className="admin-btn-ghost !p-1"><Pencil size={12} /></button>
@@ -321,6 +328,7 @@ export default function AdminLessons() {
                             <p className="text-sm text-slate-200 font-medium">
                               <span className="text-slate-500 mr-1">{qi + 1}.</span>{q.question}
                             </p>
+                            {qi === 0 && <span className="inline-flex mt-1.5 text-[10px] font-black uppercase tracking-wide text-amber-500 bg-amber-500/10 border border-amber-500/25 rounded-full px-2 py-0.5">Namuna · ballga kirmaydi</span>}
                             <div className="flex flex-wrap gap-1.5 mt-2">
                               {q.options.map((opt, i) => (
                                 <span key={i} className={`text-xs px-2.5 py-1 rounded-lg inline-flex items-center gap-1 ${
@@ -430,7 +438,7 @@ function ConfirmModal({ message, onConfirm, onCancel }) {
           <div className="p-2 rounded-full bg-red-500/15 shrink-0">
             <AlertTriangle size={20} className="text-red-400" />
           </div>
-          <p className="text-slate-300 text-sm leading-relaxed pt-1">{message}</p>
+          <p className="admin-text-body text-sm leading-relaxed pt-1">{message}</p>
         </div>
         <div className="flex gap-2 justify-end">
           <button onClick={onCancel} className="admin-btn-ghost">Bekor qilish</button>
@@ -446,10 +454,10 @@ function ConfirmModal({ message, onConfirm, onCancel }) {
 /* ─────────────────────────────────────────────
    Modal wrapper
 ───────────────────────────────────────────── */
-function ModalWrapper({ title, subtitle, onClose, children }) {
+function ModalWrapper({ title, subtitle, onClose, children, wide = false }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="admin-modal rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
+      <div className={`admin-modal rounded-2xl shadow-2xl w-full ${wide ? 'max-w-5xl' : 'max-w-lg'} max-h-[90vh] flex flex-col`}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-inherit shrink-0">
           <div>
             <h2 className="font-semibold admin-text-title">{title}</h2>
@@ -798,16 +806,18 @@ function ExerciseModal({ data, lessons, onClose, onSave }) {
   const [content, setContent] = useState(() => buildDefaultContent(data));
   const [audioUrl, setAudioUrl] = useState(data?.audio_url ?? '');
   const [hasAudio, setHasAudio] = useState(data?.has_audio ?? false);
+  const [order, setOrder] = useState(data?.order ?? 0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   function buildDefaultContent(d) {
     if (d?.content) return d.content;
     return {
-      choose_correct: { sentences: [{ before: '', options: ['', ''], after: '', correct: 0 }] },
-      fill_blank:     { sentences: [{ text: '', answer: '' }], word_panel: [] },
-      matching:       { left: [''], right: [''], pairs: [0] },
-      listening:      { questions: [{ question: '', options: ['', '', '', ''], correct: 0 }] },
+      choose_correct: { sentences: [{ before: '', options: ['', ''], after: '', correct: 0 }, { before: '', options: ['', ''], after: '', correct: 0 }] },
+      fill_blank:     { sentences: [{ text: '', answer: '' }, { text: '', answer: '' }], word_panel: [] },
+      matching:       { left: ['', ''], right: ['', ''], pairs: [0, 1] },
+      listening:      { questions: [{ question: '', options: ['', '', '', ''], correct: 0 }, { question: '', options: ['', '', '', ''], correct: 0 }], pages: [] },
+      reading:        { passage_title: '', pages: [], questions: [{ question: '', options: ['', '', '', ''], correct: 0 }, { question: '', options: ['', '', '', ''], correct: 0 }] },
       speaking:       { prompt: '' },
     }[d?.type ?? 'choose_correct'] ?? {};
   }
@@ -815,10 +825,11 @@ function ExerciseModal({ data, lessons, onClose, onSave }) {
   const switchType = (t) => {
     setType(t);
     setContent({
-      choose_correct: { sentences: [{ before: '', options: ['', ''], after: '', correct: 0 }] },
-      fill_blank:     { sentences: [{ text: '', answer: '' }], word_panel: [] },
-      matching:       { left: [''], right: [''], pairs: [0] },
-      listening:      { questions: [{ question: '', options: ['', '', '', ''], correct: 0 }] },
+      choose_correct: { sentences: [{ before: '', options: ['', ''], after: '', correct: 0 }, { before: '', options: ['', ''], after: '', correct: 0 }] },
+      fill_blank:     { sentences: [{ text: '', answer: '' }, { text: '', answer: '' }], word_panel: [] },
+      matching:       { left: ['', ''], right: ['', ''], pairs: [0, 1] },
+      listening:      { questions: [{ question: '', options: ['', '', '', ''], correct: 0 }, { question: '', options: ['', '', '', ''], correct: 0 }], pages: [] },
+      reading:        { passage_title: '', pages: [], questions: [{ question: '', options: ['', '', '', ''], correct: 0 }, { question: '', options: ['', '', '', ''], correct: 0 }] },
       speaking:       { prompt: '' },
     }[t] ?? {});
     if (t === 'listening' || t === 'speaking') {
@@ -838,6 +849,7 @@ function ExerciseModal({ data, lessons, onClose, onSave }) {
         lesson: Number(lessonId), type, instruction, content,
         has_audio: hasAudio,
         audio_url: audioUrl.trim() || null,
+        order: Number(order) || 0,
       };
       if (isEdit) {
         await api.put(`/quiz/exercises/${data.id}/`, payload);
@@ -845,14 +857,19 @@ function ExerciseModal({ data, lessons, onClose, onSave }) {
         await api.post('/quiz/exercises/', payload);
       }
       onSave();
-    } catch { setError('Saqlashda xatolik'); }
+    } catch (saveError) {
+      const details = saveError.response?.data;
+      setError(details ? Object.values(details).flat().join(' ') : 'Saqlashda xatolik');
+    }
     finally { setSaving(false); }
   };
 
   return (
     <ModalWrapper
       title={isEdit ? 'Mashqni tahrirlash' : 'Yangi mashq qo\'shish'}
+      subtitle="Birinchi savol namuna sifatida ko'rsatiladi va natijaga qo'shilmaydi"
       onClose={onClose}
+      wide
     >
       <div className="space-y-4">
         {/* Lesson select */}
@@ -871,7 +888,7 @@ function ExerciseModal({ data, lessons, onClose, onSave }) {
         {/* Type selector */}
         <div>
           <label className="block text-sm font-medium mb-2">Mashq turi</label>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
             {EXERCISE_TYPES.map((t) => {
               const Icon = t.icon;
               return (
@@ -906,7 +923,18 @@ function ExerciseModal({ data, lessons, onClose, onSave }) {
               className="w-full px-4 py-2.5 border border-teal-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-400 text-sm bg-teal-50"
             />
             <p className="text-xs admin-text-muted">MP3 URL yoki YouTube havola kiritish mumkin</p>
+            {type === 'listening' && (
+              <AudioLibraryPicker
+                unit={lessons.find((lesson) => lesson.id === Number(lessonId))?.order}
+                selected={audioUrl}
+                onSelect={(url) => { setAudioUrl(url); setHasAudio(true); }}
+              />
+            )}
           </div>
+        )}
+
+        {type === 'listening' && (
+          <BookPagePicker pages={content.pages || []} onChange={(pages) => setContent({ ...content, pages })} compact />
         )}
 
         {/* Instruction */}
@@ -934,9 +962,17 @@ function ExerciseModal({ data, lessons, onClose, onSave }) {
         {type === 'listening' && (
           <ListeningEditor content={content} setContent={setContent} />
         )}
+        {type === 'reading' && (
+          <ReadingEditor content={content} setContent={setContent} />
+        )}
         {type === 'speaking' && (
           <SpeakingEditor content={content} setContent={setContent} />
         )}
+
+        <div className="grid sm:grid-cols-2 gap-3 items-end">
+          <Field label="Tartib raqami" value={String(order)} onChange={(value) => setOrder(Number(value))} type="number" />
+          <p className="text-xs admin-text-muted pb-3">Kichik raqamli mashq yuqoriroq chiqadi.</p>
+        </div>
 
         {error && <p className="text-sm text-red-500">{error}</p>}
         <button
@@ -1070,10 +1106,6 @@ function MatchingEditor({ content, setContent }) {
     const r = [...right]; r[i] = val;
     setContent({ left, right: r, pairs });
   };
-  const updatePair = (i, val) => {
-    const p = [...pairs]; p[i] = Number(val);
-    setContent({ left, right, pairs: p });
-  };
   const addPair = () => {
     setContent({ left: [...left, ''], right: [...right, ''], pairs: [...pairs, right.length] });
   };
@@ -1106,12 +1138,12 @@ function MatchingEditor({ content, setContent }) {
 }
 
 /* listening content editor */
-function ListeningEditor({ content, setContent }) {
+function ListeningEditor({ content, setContent, label = 'Tinglash savollari' }) {
   const questions = content.questions || [];
 
   const updateQ = (i, key, val) => {
     const qs = questions.map((q, qi) => qi === i ? { ...q, [key]: val } : q);
-    setContent({ questions: qs });
+    setContent({ ...content, questions: qs });
   };
   const updateOpt = (i, oi, val) => {
     const qs = questions.map((q, qi) => {
@@ -1119,18 +1151,19 @@ function ListeningEditor({ content, setContent }) {
       const opts = [...q.options]; opts[oi] = val;
       return { ...q, options: opts };
     });
-    setContent({ questions: qs });
+    setContent({ ...content, questions: qs });
   };
   const addQuestion = () =>
-    setContent({ questions: [...questions, { question: '', options: ['', '', '', ''], correct: 0 }] });
+    setContent({ ...content, questions: [...questions, { question: '', options: ['', '', '', ''], correct: 0 }] });
   const removeQuestion = (i) =>
-    setContent({ questions: questions.filter((_, qi) => qi !== i) });
+    setContent({ ...content, questions: questions.filter((_, qi) => qi !== i) });
 
   return (
     <div className="space-y-3">
-      <label className="block text-sm font-medium">Tinglash savollari</label>
+      <label className="block text-sm font-medium">{label}</label>
       {questions.map((q, i) => (
-        <div key={i} className="border border-teal-200 rounded-xl p-3 space-y-2 bg-teal-50/40">
+        <div key={i} className={`border rounded-xl p-3 space-y-2 ${i === 0 ? 'border-amber-400/50 bg-amber-500/5' : 'border-teal-400/30 bg-teal-500/5'}`}>
+          {i === 0 && <p className="text-[10px] font-black uppercase tracking-wider text-amber-500">Namuna · ballga kirmaydi</p>}
           <input
             value={q.question}
             onChange={(e) => updateQ(i, 'question', e.target.value)}
@@ -1166,6 +1199,147 @@ function ListeningEditor({ content, setContent }) {
       <button onClick={addQuestion} className="text-xs text-teal-600 hover:text-teal-700 flex items-center gap-1">
         <Plus size={12} /> Savol qo'shish
       </button>
+    </div>
+  );
+}
+
+function ReadingEditor({ content, setContent }) {
+  const usesWrittenAnswers = Array.isArray(content.sentences) && !content.questions?.length;
+  return (
+    <div className="space-y-5 rounded-2xl border border-indigo-500/25 bg-indigo-500/5 p-4">
+      <div>
+        <label className="block text-sm font-medium mb-1">Matn sarlavhasi</label>
+        <input
+          value={content.passage_title || ''}
+          onChange={(event) => setContent({ ...content, passage_title: event.target.value })}
+          placeholder="Masalan: A day in London"
+          className="admin-input-sm w-full"
+        />
+      </div>
+      <BookPagePicker pages={content.pages || []} onChange={(pages) => setContent({ ...content, pages })} />
+      {usesWrittenAnswers
+        ? <FillBlankEditor content={content} setContent={setContent} />
+        : <ListeningEditor content={content} setContent={setContent} label="Reading savollari" />}
+    </div>
+  );
+}
+
+function BookPagePicker({ pages, onChange, compact = false }) {
+  const [open, setOpen] = useState(false);
+  const [assets, setAssets] = useState([]);
+  const [query, setQuery] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!open || assets.length) return;
+    api.get('/quiz/assets/?kind=book')
+      .then(({ data }) => setAssets(data.results || []))
+      .finally(() => setLoading(false));
+  }, [open, assets.length]);
+
+  const selectedUrls = new Set(pages.map((page) => typeof page === 'string' ? page : page.url));
+  const filtered = assets.filter((asset) => !query || String(asset.page_number).includes(query.trim()));
+  const add = (asset) => {
+    if (selectedUrls.has(asset.url)) return;
+    onChange([...pages, { url: asset.url, page_number: asset.page_number, caption: `Practice Book — ${asset.page_number}-sahifa` }]);
+  };
+  const remove = (index) => onChange(pages.filter((_, pageIndex) => pageIndex !== index));
+  const move = (index, direction) => {
+    const nextIndex = index + direction;
+    if (nextIndex < 0 || nextIndex >= pages.length) return;
+    const next = [...pages];
+    [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+    onChange(next);
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium admin-text-body">Kitob sahifalari *</p>
+          <p className="text-xs admin-text-muted">Bir nechta sahifani tanlab, tartibini o'zgartirish mumkin.</p>
+        </div>
+        <button type="button" onClick={() => { if (!open && !assets.length) setLoading(true); setOpen((value) => !value); }} className="admin-btn-ghost !text-xs border border-border">
+          <BookMarked size={14} /> {open ? 'Kutubxonani yopish' : 'Sahifa tanlash'}
+        </button>
+      </div>
+
+      {pages.length > 0 ? (
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {pages.map((page, index) => {
+            const value = typeof page === 'string' ? { url: page } : page;
+            return (
+              <div key={`${value.url}-${index}`} className="relative shrink-0 w-28 rounded-xl border border-border bg-surface-100 overflow-hidden group">
+                <img src={value.url} alt="" className={`${compact ? 'h-24' : 'h-36'} w-full object-cover object-top`} />
+                <div className="px-2 py-1.5 text-[10px] font-bold admin-text-body truncate">{value.page_number ? `${value.page_number}-sahifa` : `Sahifa ${index + 1}`}</div>
+                <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition">
+                  <button type="button" onClick={() => move(index, -1)} className="p-1 bg-black/70 text-white rounded"><ArrowUp size={11} /></button>
+                  <button type="button" onClick={() => move(index, 1)} className="p-1 bg-black/70 text-white rounded"><ArrowDown size={11} /></button>
+                  <button type="button" onClick={() => remove(index)} className="p-1 bg-red-600 text-white rounded"><X size={11} /></button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : <p className="text-xs text-amber-500">Hali sahifa tanlanmagan.</p>}
+
+      {open && (
+        <div className="rounded-xl border border-border bg-surface-200/60 p-3">
+          <div className="relative mb-3">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 admin-text-muted" />
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Sahifa raqami..." className="admin-input-sm w-full !pl-9" />
+          </div>
+          {loading ? <Loader2 className="animate-spin text-indigo-500 mx-auto my-8" /> : (
+            <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-8 gap-2 max-h-72 overflow-y-auto pr-1">
+              {filtered.map((asset) => (
+                <button key={asset.url} type="button" onClick={() => add(asset)} disabled={selectedUrls.has(asset.url)} className={`rounded-lg border overflow-hidden text-left transition ${selectedUrls.has(asset.url) ? 'border-emerald-500 opacity-45' : 'border-border hover:border-indigo-500'}`}>
+                  <img src={asset.url} alt="" loading="lazy" className="h-24 w-full object-cover object-top" />
+                  <span className="block px-1.5 py-1 text-[10px] font-bold admin-text-body">{asset.page_number}-sahifa</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AudioLibraryPicker({ unit, selected, onSelect }) {
+  const [open, setOpen] = useState(false);
+  const [assets, setAssets] = useState([]);
+  const [query, setQuery] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const unitQuery = unit ? `&unit=${encodeURIComponent(unit)}` : '';
+    api.get(`/quiz/assets/?kind=audio${unitQuery}`)
+      .then(({ data }) => setAssets(data.results || []))
+      .finally(() => setLoading(false));
+  }, [open, unit]);
+
+  const filtered = assets.filter((asset) => !query || asset.name.toLowerCase().includes(query.toLowerCase()));
+  return (
+    <div className="rounded-xl border border-teal-500/25 bg-teal-500/5 p-3">
+      <button type="button" onClick={() => { if (!open) setLoading(true); setOpen((value) => !value); }} className="flex items-center justify-between gap-3 w-full text-left">
+        <span className="inline-flex items-center gap-2 text-xs font-bold text-teal-500"><Music2 size={14} /> Audio kutubxonasi {unit ? `· Unit ${unit}` : ''}</span>
+        <span className="text-xs admin-text-muted">{open ? 'Yopish' : 'Tanlash'}</span>
+      </button>
+      {open && (
+        <div className="mt-3 space-y-2">
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Trekni qidiring..." className="admin-input-sm w-full" />
+          <div className="max-h-48 overflow-y-auto space-y-1">
+            {loading && <Loader2 className="animate-spin text-teal-500 mx-auto my-5" />}
+            {!loading && filtered.map((asset) => (
+              <button key={asset.url} type="button" onClick={() => onSelect(asset.url)} className={`w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg border text-xs transition ${selected === asset.url ? 'border-emerald-500 bg-emerald-500/10 text-emerald-500' : 'border-border admin-text-body hover:border-teal-500'}`}>
+                <span className="truncate">{asset.name}</span><span className="admin-text-muted shrink-0">{asset.track}</span>
+              </button>
+            ))}
+            {!loading && !filtered.length && <p className="text-xs admin-text-muted text-center py-4">Audio topilmadi.</p>}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

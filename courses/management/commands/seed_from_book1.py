@@ -52,9 +52,12 @@ EXERCISE TYPES SUPPORTED:
 4. "listening" — has a headphone icon, track number nearby.
    content: {"questions": [{"question": "...", "options": ["A","B"], "correct": 0}]}
    Set "audio_track" to the track string (e.g., "1.2").
+5. "reading" — an article, email, blog, advert, or other passage followed by questions.
+   content: {"passage_title": "...", "questions": [{"question": "...", "options": ["A","B"], "correct": 0}]}
+   Do not transcribe the whole passage: the original page image is attached automatically.
 
 SKIP rules:
-- Skip exercises that require a picture/diagram to answer (UNLESS it's a listening exercise).
+- Skip exercises that require a picture/diagram to answer (UNLESS it's a listening or reading exercise).
 - Skip vocabulary reference pages, contents pages, answer key pages.
 
 Return ONLY valid JSON in ```json ... ``` blocks:
@@ -273,13 +276,14 @@ class Command(BaseCommand):
 
             for ex_data in exercises:
                 ex_type = ex_data.get('type')
-                if ex_type not in ('choose_correct', 'fill_blank', 'matching', 'listening'):
+                if ex_type not in ('choose_correct', 'fill_blank', 'matching', 'listening', 'reading'):
                     continue
 
                 is_listening = ex_data.get('is_listening', False) or (ex_type == 'listening')
+                is_reading = ex_type == 'reading'
                 has_image = ex_data.get('has_linked_image', False)
 
-                if has_image and not is_listening:
+                if has_image and not is_listening and not is_reading:
                     continue  # rasmga bog'liq oddiy topshiriqni o'tkazib yubor
 
                 content = ex_data.get('content', {})
@@ -291,6 +295,16 @@ class Command(BaseCommand):
                     audio_url = find_audio_url(track)
                     if has_image:
                         content['image_url'] = f'/static/book/{filename}'
+
+                if is_reading:
+                    content['pages'] = [{
+                        'url': f'/static/book/{filename}',
+                        'page_number': page_num,
+                        'caption': f'Practice Book — {page_num}-sahifa',
+                    }]
+                    questions = content.get('questions') or []
+                    if questions:
+                        questions[0]['is_example'] = True
 
                 Exercise.objects.create(
                     lesson=lesson,

@@ -45,7 +45,9 @@ lrnen/
 - **7 learning levels** — A1, A2, B1, B2, C1, C2, IELTS
 - **Video lessons** with descriptions and ordering
 - **Vocabulary** — English/Uzbek translations with examples
-- **5 exercise types** — choose_correct, fill_blank, matching, listening, speaking
+- **6 exercise types** — choose_correct, fill_blank, matching, listening, reading, speaking
+- **Multi-page reading** — original book pages, fullscreen/zoom viewer, and questions below the passage
+- **Admin asset library** — select local Practice Book pages and unit audio without copying URLs
 - **Multiple-choice quizzes** with automatic scoring
 - **Progress tracking** — per-lesson status and score
 - **XP leaderboard** — top 20 students ranked by experience points
@@ -112,6 +114,7 @@ Lesson ──1:M──► Comment
 | POST | `/submit/` | Submit answers → score + XP |
 | GET/POST | `/exercises/` | List / create exercises |
 | PUT/DELETE | `/exercises/<id>/` | Manage exercise |
+| GET | `/assets/?kind=book\|audio` | Admin book-page/audio picker |
 
 ### Comments — `/api/comments/`
 
@@ -188,6 +191,17 @@ ANTHROPIC_API_KEY=your-anthropic-api-key
 ## Django Admin
 
 Access the built-in admin panel at `/admin/` with a superuser account to manage all models directly.
+
+### Existing Book 1 reading content
+
+The verified reading-page mapping is idempotent and can safely be rerun after importing Book 1:
+
+```bash
+python manage.py migrate
+python manage.py upgrade_reading_exercises
+```
+
+Use `--dry-run` to preview the 18 detected reading exercises without changing data.
 
 ---
 

@@ -6,7 +6,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-me-in-production')
 
-DEBUG = config('DEBUG', default=True, cast=bool)
+DEBUG_VALUE = str(config('DEBUG', default='true')).strip().lower()
+# Accept conventional deployment labels in addition to true/false. The previous
+# bool cast crashed management commands when DEBUG=release was used.
+DEBUG = DEBUG_VALUE in {'1', 'true', 'yes', 'on', 'debug', 'development'}
 
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='*').split(',')
 
@@ -106,5 +109,3 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [
     BASE_DIR / 'static',
 ]
-if (BASE_DIR / 'static').exists():
-    STATICFILES_DIRS.append(BASE_DIR / 'static')

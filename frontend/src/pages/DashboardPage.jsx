@@ -1,224 +1,138 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { CheckCircle, Flame, Loader2, Map, Zap } from 'lucide-react';
+import api from '../api';
+import LearningRoadmap from '../components/lesson/LearningRoadmap';
 import { useAuth } from '../context/AuthContext';
 import { useGame } from '../context/GameContext';
-import api from '../api';
-import { Search, CheckCircle, Clock, Loader2, Zap, Flame, ChevronRight } from 'lucide-react';
-import { formatLessonTitle, getUnitNumber } from '../utils/lessonDisplay';
 
 export default function DashboardPage() {
   const { user } = useAuth();
   const { xp, streak, badges } = useGame();
   const [lessons, setLessons] = useState([]);
-  const [search, setSearch] = useState('');
   const [progress, setProgress] = useState({});
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     Promise.all([
       api.get('/courses/lessons/'),
       api.get('/courses/progress/'),
-    ]).then(([lsns, prog]) => {
-      setLessons(lsns.data);
-      const progressMap = {};
-      prog.data.forEach((p) => { progressMap[p.lesson] = p; });
-      setProgress(progressMap);
-    }).finally(() => setLoading(false));
+    ])
+      .then(([lessonResponse, progressResponse]) => {
+        setLessons(lessonResponse.data);
+        const progressMap = {};
+        progressResponse.data.forEach((item) => {
+          progressMap[item.lesson] = item;
+        });
+        setProgress(progressMap);
+      })
+      .catch(() => setLoadError(true))
+      .finally(() => setLoading(false));
   }, []);
 
-  const filtered = lessons.filter((l) => {
-    const title = formatLessonTitle(l.title);
-    return title.toLowerCase().includes(search.toLowerCase());
-  });
-
-  const completedCount = Object.values(progress).filter((p) => p.status === 'completed').length;
-  const currentLesson = lessons.find((l) => progress[l.id]?.status !== 'completed');
+  const completedCount = lessons.filter(
+    (lesson) => progress[lesson.id]?.status === 'completed',
+  ).length;
+  const completionPercent = lessons.length
+    ? Math.round((completedCount / lessons.length) * 100)
+    : 0;
+  const currentLesson = lessons.find(
+    (lesson) => progress[lesson.id]?.status !== 'completed' && !lesson.is_locked,
+  );
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="flex min-h-[60vh] items-center justify-center">
         <Loader2 className="animate-spin text-indigo-400" size={40} />
       </div>
     );
   }
 
+  if (loadError) {
+    return (
+      <div className="mx-auto max-w-xl px-4 py-20 text-center">
+        <div className="student-card p-8">
+          <div className="mb-4 text-5xl" aria-hidden="true">🧭</div>
+          <h1 className="stu-title text-xl font-extrabold">Yo‘l xaritasini yuklab bo‘lmadi</h1>
+          <p className="stu-muted mt-2">Internet aloqasini tekshirib, sahifani qayta yangilang.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8">
-
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-white mb-1">
-          Salom, {(user?.full_name || user?.username || 'O\'quvchi').split(' ')[0]}! 👋
-        </h1>
-        <p className="text-slate-400 mb-4">
-          {currentLesson
-            ? 'Keyingi darsingiz tayyor — boshlaymizmi?'
-            : completedCount > 0
-              ? 'Barcha mavjud darslarni yakunladingiz!'
-              : 'Birinchi darsdan boshlang'}
-        </p>
-
-        <div className="flex gap-3 flex-wrap">
-          <div className="flex items-center gap-2 bg-violet-500/15 text-violet-300 px-3 py-1.5 rounded-full text-sm font-semibold border border-violet-500/25">
-            <Zap size={14} className="text-violet-500" />
-            {xp} XP
-          </div>
-          {streak > 0 && (
-            <div className="flex items-center gap-2 bg-orange-500/15 text-orange-300 px-3 py-1.5 rounded-full text-sm font-semibold border border-orange-500/25">
-              <Flame size={14} className="text-orange-500" />
-              {streak} kunlik seria
+    <div className="mx-auto max-w-5xl px-3 py-7 sm:px-5 sm:py-9">
+      <section className="mb-6 overflow-hidden rounded-3xl border border-indigo-500/20 bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 p-5 text-white shadow-xl shadow-indigo-500/15 sm:p-7">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="mb-2 flex items-center gap-2 text-xs font-extrabold uppercase tracking-[.15em] text-indigo-100">
+              <Map size={16} /> Mening o‘quv sayohatim
             </div>
+            <h1 className="text-2xl font-black sm:text-3xl">
+              Salom, {(user?.full_name || user?.username || 'O‘quvchi').split(' ')[0]}! 👋
+            </h1>
+            <p className="mt-2 max-w-xl text-sm text-indigo-100 sm:text-base">
+              {currentLesson
+                ? `Keyingi manzil — ${currentLesson.order || completedCount + 1}-dars. Yo‘lni davom ettiramiz!`
+                : completedCount > 0
+                  ? 'Ajoyib! Barcha mavjud darslarni yakunladingiz.'
+                  : 'Birinchi darsdan boshlang va yangi hududlarni oching.'}
+            </p>
+          </div>
+
+          <div className="min-w-48 rounded-2xl border border-white/20 bg-white/10 p-4 backdrop-blur-sm">
+            <div className="flex items-end justify-between">
+              <span className="text-xs font-bold text-indigo-100">Umumiy yo‘l</span>
+              <strong className="text-2xl font-black">{completionPercent}%</strong>
+            </div>
+            <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-black/15">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-amber-300 to-yellow-100 transition-all duration-700"
+                style={{ width: `${completionPercent}%` }}
+              />
+            </div>
+            <p className="mt-2 text-xs text-indigo-100">{completedCount} / {lessons.length} dars yakunlandi</p>
+          </div>
+        </div>
+
+        <div className="mt-5 flex flex-wrap gap-2">
+          <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-sm font-bold">
+            <Zap size={14} className="text-yellow-300" /> {xp} XP
+          </span>
+          {streak > 0 && (
+            <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-sm font-bold">
+              <Flame size={14} className="text-orange-300" /> {streak} kunlik seriya
+            </span>
           )}
           {completedCount > 0 && (
-            <div className="flex items-center gap-2 bg-emerald-500/15 text-emerald-300 px-3 py-1.5 rounded-full text-sm font-semibold border border-emerald-500/25">
-              <CheckCircle size={14} />
-              {completedCount} yakunlandi
-            </div>
+            <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-sm font-bold">
+              <CheckCircle size={14} className="text-emerald-200" /> {completedCount} ta marra
+            </span>
           )}
         </div>
 
         {badges.length > 0 && (
-          <div className="flex gap-2 mt-3 flex-wrap">
-            {badges.map((b) => (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {badges.map((badge) => (
               <span
-                key={b.id}
-                title={b.desc}
-                className="inline-flex items-center gap-1.5 bg-surface-100 border border-border text-slate-300 text-xs font-semibold px-2.5 py-1 rounded-full cursor-default"
+                key={badge.id}
+                title={badge.desc}
+                className="inline-flex cursor-default items-center gap-1.5 rounded-full border border-white/15 bg-black/10 px-2.5 py-1 text-xs font-semibold"
               >
-                {b.emoji} {b.label}
+                {badge.emoji} {badge.label}
               </span>
             ))}
           </div>
         )}
-      </div>
+      </section>
 
-      {/* Search */}
-      {lessons.length > 3 && (
-        <div className="relative mb-6">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Dars qidirish..."
-            className="admin-input pl-10"
-          />
-        </div>
-      )}
-
-      {/* Lesson path */}
-      {filtered.length === 0 ? (
-        <div className="text-center py-20">
-          <div className="text-6xl mb-4">🔍</div>
-          <p className="text-slate-300 text-lg font-medium">Dars topilmadi</p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {filtered.map((lesson, idx) => (
-            <LessonRow
-              key={lesson.id}
-              lesson={lesson}
-              progress={progress[lesson.id]}
-              isCurrent={lesson.id === currentLesson?.id}
-              isLast={idx === filtered.length - 1}
-              onClick={() => navigate(`/lessons/${lesson.id}`)}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function LessonRow({ lesson, progress, isCurrent, isLast, onClick }) {
-  const isCompleted = progress?.status === 'completed';
-  const isInProgress = progress?.status === 'in-progress';
-  const score = progress?.score || 0;
-  const unitNum = getUnitNumber(lesson.title);
-  const title = formatLessonTitle(lesson.title);
-
-  return (
-    <div className="flex gap-4">
-      {/* Timeline */}
-      <div className="flex flex-col items-center shrink-0 w-8">
-        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-          isCompleted
-            ? 'bg-emerald-500/20 text-emerald-400 border-2 border-emerald-500/40'
-            : isCurrent
-              ? 'bg-indigo-500 text-white border-2 border-indigo-400 shadow-lg shadow-indigo-500/30'
-              : 'bg-surface-200 text-slate-400 border-2 border-border'
-        }`}>
-          {isCompleted ? <CheckCircle size={16} /> : unitNum ?? '·'}
-        </div>
-        {!isLast && (
-          <div className={`w-0.5 flex-1 min-h-[12px] mt-1 ${
-            isCompleted ? 'bg-emerald-500/30' : 'bg-border'
-          }`} />
-        )}
-      </div>
-
-      {/* Card */}
-      <button
-        onClick={onClick}
-        className={`flex-1 text-left student-card p-4 mb-1 transition-all duration-200 hover:-translate-y-0.5 ${
-          isCurrent ? 'border-indigo-500/40 ring-1 ring-indigo-500/20' : ''
-        }`}
-      >
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              {isCurrent && (
-                <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-400 bg-indigo-500/15 px-2 py-0.5 rounded-full">
-                  Hozirgi dars
-                </span>
-              )}
-              {isCompleted && (
-                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/15 px-2 py-0.5 rounded-full">
-                  Yakunlandi
-                </span>
-              )}
-              {isInProgress && !isCurrent && (
-                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 bg-amber-500/15 px-2 py-0.5 rounded-full">
-                  Jarayonda
-                </span>
-              )}
-            </div>
-            <h3 className="font-bold text-white text-base leading-snug truncate">{title}</h3>
-          </div>
-          <ChevronRight size={18} className="text-slate-500 shrink-0" />
-        </div>
-
-        {progress && (
-          <div className="mt-3">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs text-slate-500">
-                {isCompleted ? 'Natija' : 'Jarayon'}
-              </span>
-              <span className={`text-xs font-bold ${isCompleted ? 'text-emerald-400' : 'text-amber-400'}`}>
-                {score}%
-              </span>
-            </div>
-            <div className="w-full bg-surface-200 rounded-full h-1.5 overflow-hidden">
-              <div
-                className={`h-1.5 rounded-full transition-all duration-500 ${
-                  isCompleted
-                    ? 'bg-gradient-to-r from-emerald-400 to-green-500'
-                    : 'bg-gradient-to-r from-amber-400 to-orange-400'
-                }`}
-                style={{ width: `${score}%` }}
-              />
-            </div>
-          </div>
-        )}
-
-        {isCurrent && !progress && (
-          <p className="text-xs text-indigo-400 mt-2 flex items-center gap-1">
-            <Clock size={12} />
-            Boshlash uchun bosing
-          </p>
-        )}
-      </button>
+      <LearningRoadmap
+        lessons={lessons}
+        progress={progress}
+        onOpenLesson={(lesson) => navigate(`/lessons/${lesson.id}`)}
+      />
     </div>
   );
 }

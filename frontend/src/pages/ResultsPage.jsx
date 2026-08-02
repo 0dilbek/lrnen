@@ -41,8 +41,8 @@ export default function ResultsPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold text-white mb-1">Natijalarim</h1>
-      <p className="text-slate-400 mb-6">Umumiy bilim darajangiz statistikasi</p>
+      <h1 className="text-2xl font-bold stu-title mb-1">Natijalarim</h1>
+      <p className="stu-muted mb-6">Umumiy bilim darajangiz statistikasi</p>
 
       {progress.length > 0 ? (
         <div className={`bg-gradient-to-r ${scoreInfo.color} rounded-2xl p-6 mb-8 text-white flex items-center gap-5 shadow-lg`}>
@@ -55,7 +55,7 @@ export default function ResultsPage() {
       ) : (
         <div className="text-center py-16 student-card mb-8">
           <div className="text-6xl mb-4">📊</div>
-          <p className="text-xl font-bold text-white mb-2">Hali natija yo'q</p>
+          <p className="text-xl font-bold stu-title mb-2">Hali natija yo'q</p>
           <p className="text-slate-500 mb-6">Birinchi darsni yakunlang va natijangizni ko'ring!</p>
           <button
             onClick={() => navigate('/dashboard')}
@@ -75,7 +75,7 @@ export default function ResultsPage() {
       {progress.length > 0 && (
         <div className="student-card overflow-hidden">
           <div className="px-6 py-4 border-b border-border">
-            <h2 className="font-semibold text-white flex items-center gap-2">
+            <h2 className="font-semibold stu-title flex items-center gap-2">
               <TrendingUp size={18} className="text-indigo-400" />
               Darslar bo'yicha natijalar
             </h2>
@@ -91,7 +91,7 @@ export default function ResultsPage() {
                   className="px-6 py-4 flex items-center gap-4 cursor-pointer hover:bg-surface-200/40 transition"
                 >
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-white truncate">{formatLessonTitle(p.lesson_title)}</p>
+                    <p className="font-medium stu-title truncate">{formatLessonTitle(p.lesson_title)}</p>
                     <div className="flex items-center gap-3 mt-1.5">
                       <div className="flex-1 bg-surface-200 rounded-full h-2 overflow-hidden">
                         <div

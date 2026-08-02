@@ -15,7 +15,6 @@ class ExerciseAdmin(admin.ModelAdmin):
     list_filter = ['type', 'has_audio', 'lesson']
     search_fields = ['instruction']
     list_editable = ['order', 'has_audio']
-    readonly_fields = ['type']
 
 
 class QuizAttemptAnswerInline(admin.TabularInline):

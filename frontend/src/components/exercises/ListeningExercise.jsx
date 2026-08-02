@@ -1,23 +1,34 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { Play, Pause, RotateCcw, Volume2, Maximize2, X, ZoomIn, ZoomOut } from 'lucide-react';
+import ExampleBadge from './ExampleBadge';
+import FillBlankExercise from './FillBlankExercise';
+import MatchingExercise from './MatchingExercise';
+import BookPageViewer from './BookPageViewer';
 
 /**
  * Listening exercise
  *
  * exercise.audio_url  — audio manzili (YouTube embed yoki to'g'ridan mp3 URL)
- * exercise.content    — { questions: [{ question, options, correct }] }
+ * exercise.content    — { questions } | { sentences } | { left, right, pairs }
  */
 export default function ListeningExercise({ exercise, onComplete }) {
   const { audio_url, content } = exercise;
-  const questions = content?.questions || content?.items?.map((item) => ({
+  const questions = useMemo(() => content?.questions || content?.items?.map((item) => ({
     question: item.question || item.sentence || '',
     options: item.options || [],
     correct: item.correct_index ?? item.correct ?? 0,
-  })) || [];
+  })) || [], [content]);
+  const hasSentenceContent = Array.isArray(content?.sentences) && content.sentences.length > 0 && questions.length === 0;
+  const hasMatchingContent = Array.isArray(content?.left) && Array.isArray(content?.right) && questions.length === 0;
 
   const audioRef = useRef(null);
   const [playing, setPlaying] = useState(false);
-  const [answers, setAnswers] = useState({});
+  const hasExample = questions.length >= 2;
+  const exampleAnswers = useMemo(
+    () => (hasExample ? { 0: questions[0].correct } : {}),
+    [hasExample, questions]
+  );
+  const [answers, setAnswers] = useState(() => ({ ...exampleAnswers }));
   const [submitted, setSubmitted] = useState(false);
   const [modalImage, setModalImage] = useState(null);
   const [zoom, setZoom] = useState(1);
@@ -49,20 +60,23 @@ export default function ListeningExercise({ exercise, onComplete }) {
 
   /* ── answers ── */
   const choose = (qi, idx) => {
-    if (submitted) return;
+    if (submitted || (hasExample && qi === 0)) return;
     setAnswers((a) => ({ ...a, [qi]: idx }));
   };
 
+  const scorable = hasExample ? questions.slice(1) : questions;
+
   const handleSubmit = () => {
-    if (questions.length === 0) return;
-    if (Object.keys(answers).length < questions.length) return;
+    if (scorable.length === 0) return;
+    const allDone = scorable.every((_, i) => answers[hasExample ? i + 1 : i] !== undefined);
+    if (!allDone) return;
     setSubmitted(true);
-    const correct = questions.filter((q, i) => answers[i] === q.correct).length;
-    onComplete?.(correct, questions.length);
+    const correct = scorable.filter((q, i) => answers[hasExample ? i + 1 : i] === q.correct).length;
+    onComplete?.(correct, scorable.length);
   };
 
   const reset = () => {
-    setAnswers({});
+    setAnswers({ ...exampleAnswers });
     setSubmitted(false);
   };
 
@@ -76,6 +90,9 @@ export default function ListeningExercise({ exercise, onComplete }) {
 
   return (
     <div className="space-y-4">
+      {Array.isArray(content?.pages) && content.pages.length > 0 && (
+        <BookPageViewer pages={content.pages} title="Listening sahifalari" />
+      )}
       {/* ── Topshiriq rasmlari ── */}
       {content?.image_url && (
         <div className="relative group rounded-xl overflow-hidden border border-gray-200 shadow-sm max-h-96 flex justify-center bg-gray-50 cursor-zoom-in" onClick={() => setModalImage(content.image_url)}>
@@ -225,46 +242,73 @@ export default function ListeningExercise({ exercise, onComplete }) {
         </div>
       )}
 
+      {/* sentences → fill blank (namuna 1-savolda) */}
+      {hasSentenceContent && (
+        <FillBlankExercise
+          exercise={{ ...exercise, content: { sentences: content.sentences, word_panel: content.word_panel } }}
+          onComplete={onComplete}
+        />
+      )}
+
+      {/* matching content */}
+      {hasMatchingContent && (
+        <MatchingExercise exercise={exercise} onComplete={onComplete} />
+      )}
+
       {/* ── Questions ── */}
       {questions.length > 0 && (
         <div className="space-y-3">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Savollar</p>
-          {questions.map((q, qi) => (
-            <div key={qi} className="border border-gray-200 rounded-xl p-4 bg-white">
-              <p className="text-sm font-medium text-gray-800 mb-3">
-                <span className="text-gray-400 mr-1">{qi + 1}.</span>
-                {q.question}
-              </p>
-              <div className="space-y-1.5">
-                {q.options.map((opt, oi) => {
-                  const chosen = answers[qi] === oi;
-                  let cls = 'border-gray-200 bg-white text-gray-700 hover:border-teal-300 hover:bg-teal-50';
-                  if (submitted) {
-                    if (oi === q.correct) cls = 'border-green-400 bg-green-50 text-green-800 font-semibold';
-                    else if (chosen) cls = 'border-red-300 bg-red-50 text-red-700 line-through';
-                    else cls = 'border-gray-100 bg-gray-50 text-gray-400';
-                  } else if (chosen) {
-                    cls = 'border-teal-500 bg-teal-50 text-teal-800';
-                  }
-                  return (
-                    <button
-                      key={oi}
-                      onClick={() => choose(qi, oi)}
-                      disabled={submitted}
-                      className={`w-full text-left px-3 py-2 rounded-lg border text-sm transition ${cls} disabled:cursor-default`}
-                    >
-                      {opt}
-                    </button>
-                  );
-                })}
+          {hasExample && (
+            <p className="text-xs stu-muted italic">
+              1-savol namuna — shunday yechiladi. Siz 2-savoldan boshlang.
+            </p>
+          )}
+          <p className="text-xs font-semibold stu-muted uppercase tracking-wide">Savollar</p>
+          {questions.map((q, qi) => {
+            const isExample = hasExample && qi === 0;
+            return (
+              <div
+                key={qi}
+                className={`border rounded-xl p-4 ${
+                  isExample ? 'border-amber-500/30 bg-amber-500/5' : 'border-border bg-surface-100'
+                }`}
+              >
+                <p className="text-sm font-medium stu-title mb-3 flex items-center gap-2 flex-wrap">
+                  <span className="stu-muted mr-1">{qi + 1}.</span>
+                  {isExample && <ExampleBadge />}
+                  {q.question}
+                </p>
+                <div className="space-y-1.5">
+                  {q.options.map((opt, oi) => {
+                    const chosen = answers[qi] === oi;
+                    let cls = 'border-border bg-surface-50 stu-body hover:border-teal-400 hover:bg-teal-500/10';
+                    if (submitted || isExample) {
+                      if (oi === q.correct) cls = 'border-green-400 bg-green-50 text-green-800 font-semibold';
+                      else if (chosen && !isExample) cls = 'border-red-300 bg-red-50 text-red-700 line-through';
+                      else cls = 'border-border bg-surface-200 stu-muted';
+                    } else if (chosen) {
+                      cls = 'border-teal-500 bg-teal-50 text-teal-800';
+                    }
+                    return (
+                      <button
+                        key={oi}
+                        onClick={() => choose(qi, oi)}
+                        disabled={submitted || isExample}
+                        className={`w-full text-left px-3 py-2 rounded-lg border text-sm transition ${cls} disabled:cursor-default`}
+                      >
+                        {opt}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
 
           {!submitted ? (
             <button
               onClick={handleSubmit}
-              disabled={Object.keys(answers).length < questions.length}
+              disabled={scorable.some((_, i) => answers[hasExample ? i + 1 : i] === undefined)}
               className="w-full py-2.5 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white font-semibold rounded-xl transition text-sm"
             >
               Tekshirish
@@ -272,15 +316,15 @@ export default function ListeningExercise({ exercise, onComplete }) {
           ) : (
             <div className="flex items-center gap-3">
               <div className={`flex-1 text-center py-2 rounded-xl text-sm font-semibold ${
-                questions.filter((q, i) => answers[i] === q.correct).length === questions.length
+                scorable.filter((q, i) => answers[hasExample ? i + 1 : i] === q.correct).length === scorable.length
                   ? 'bg-green-100 text-green-700'
                   : 'bg-orange-100 text-orange-700'
               }`}>
-                {questions.filter((q, i) => answers[i] === q.correct).length} / {questions.length} to'g'ri
+                {scorable.filter((q, i) => answers[hasExample ? i + 1 : i] === q.correct).length} / {scorable.length} to'g'ri
               </div>
               <button
                 onClick={reset}
-                className="px-4 py-2 border border-gray-200 text-gray-600 rounded-xl text-sm hover:bg-gray-50 transition flex items-center gap-1.5"
+                className="px-4 py-2 border border-border stu-muted rounded-xl text-sm hover:bg-surface-200 transition flex items-center gap-1.5"
               >
                 <RotateCcw size={13} /> Qayta
               </button>
@@ -289,8 +333,8 @@ export default function ListeningExercise({ exercise, onComplete }) {
         </div>
       )}
 
-      {!audio_url && questions.length === 0 && (
-        <p className="text-sm text-gray-400 text-center py-4">Kontent hali qo'shilmagan</p>
+      {!audio_url && questions.length === 0 && !hasSentenceContent && !hasMatchingContent && (
+        <p className="text-sm stu-muted text-center py-4">Kontent hali qo'shilmagan</p>
       )}
     </div>
   );

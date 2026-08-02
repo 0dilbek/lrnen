@@ -1,6 +1,9 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import permissions
+from django.conf import settings
+from pathlib import Path
+import re
 from .models import Quiz, Exercise, QuizAttempt, QuizAttemptAnswer, ExerciseAttempt
 from .serializers import (
     QuizSerializer, QuizStudentSerializer, ExerciseSerializer,
@@ -15,12 +18,24 @@ class QuizListView(APIView):
 
     def get(self, request):
         lesson_id = request.query_params.get('lesson')
-        qs = Quiz.objects.all()
+        qs = Quiz.objects.all().order_by('id')
         if lesson_id:
             qs = qs.filter(lesson_id=lesson_id)
         if request.user.role == 'admin':
             return Response(QuizSerializer(qs, many=True).data)
-        return Response(QuizStudentSerializer(qs, many=True).data)
+
+        quizzes = list(qs)
+        data = QuizStudentSerializer(quizzes, many=True).data
+        # Birinchi savol — namuna (to'g'ri javob ko'rsatiladi)
+        if quizzes:
+            first_id = quizzes[0].id
+            for row, quiz in zip(data, quizzes):
+                if quiz.id == first_id:
+                    row['is_example'] = True
+                    row['correct_option_index'] = quiz.correct_option_index
+                else:
+                    row['is_example'] = False
+        return Response(data)
 
     def post(self, request):
         if request.user.role != 'admin':
@@ -96,26 +111,43 @@ class QuizSubmitView(APIView):
         except Lesson.DoesNotExist:
             return Response({'detail': 'Lesson not found'}, status=404)
 
+        lesson_quizzes = list(Quiz.objects.filter(lesson=lesson).order_by('id'))
+        example_quiz_id = lesson_quizzes[0].id if lesson_quizzes else None
+        answers_by_id = {a.get('quiz_id'): a for a in answers if a.get('quiz_id') is not None}
+
+        # Namuna savol yuborilmagan bo'lsa, to'g'ri javob bilan to'ldiramiz
+        if example_quiz_id and example_quiz_id not in answers_by_id:
+            ex_quiz = lesson_quizzes[0]
+            answers_by_id[example_quiz_id] = {
+                'quiz_id': example_quiz_id,
+                'selected_index': ex_quiz.correct_option_index,
+            }
+
         results = []
         correct_count = 0
+        scored_total = 0
         answer_objs = []
 
-        for ans in answers:
-            quiz_id = ans.get('quiz_id')
-            selected = ans.get('selected_index')
-            try:
-                quiz = Quiz.objects.get(pk=quiz_id)
-            except Quiz.DoesNotExist:
-                results.append({'quiz_id': quiz_id, 'error': 'not found'})
+        for quiz in lesson_quizzes:
+            ans = answers_by_id.get(quiz.id)
+            if not ans:
                 continue
-
+            selected = ans.get('selected_index')
+            is_example = quiz.id == example_quiz_id
             is_correct = quiz.correct_option_index == selected
-            if is_correct:
-                correct_count += 1
+
+            if is_example:
+                # Namuna ballga kirmaydi, lekin to'g'ri deb yoziladi
+                selected = quiz.correct_option_index
+                is_correct = True
+            else:
+                scored_total += 1
+                if is_correct:
+                    correct_count += 1
 
             opts = quiz.options if isinstance(quiz.options, list) else []
             results.append({
-                'quiz_id': quiz_id,
+                'quiz_id': quiz.id,
                 'question': quiz.question,
                 'options': opts,
                 'selected_index': selected,
@@ -123,6 +155,7 @@ class QuizSubmitView(APIView):
                 'correct_index': quiz.correct_option_index,
                 'correct_text': opts[quiz.correct_option_index] if opts and 0 <= quiz.correct_option_index < len(opts) else None,
                 'is_correct': is_correct,
+                'is_example': is_example,
             })
             answer_objs.append({
                 'quiz': quiz,
@@ -133,8 +166,9 @@ class QuizSubmitView(APIView):
                 'is_correct': is_correct,
             })
 
-        total = len(answer_objs)
-        score = round((correct_count / total) * 100) if total else 0
+        total = scored_total
+        score = round((correct_count / total) * 100) if total else 100
+        completed = score >= 60
 
         attempt = QuizAttempt.objects.create(
             user=request.user,
@@ -147,16 +181,26 @@ class QuizSubmitView(APIView):
             QuizAttemptAnswer.objects.create(attempt=attempt, **a)
 
         progress, _ = UserProgress.objects.get_or_create(user=request.user, lesson=lesson)
-        progress.score = score
-        progress.status = 'completed' if score >= 60 else 'in-progress'
+        if completed:
+            progress.status = 'completed'
+            progress.score = max(score, progress.score or 0)
+        elif progress.status != 'completed':
+            progress.status = 'in-progress'
+            progress.score = max(score, progress.score or 0)
         progress.save()
+
+        from courses.views import _get_next_lesson
+        next_lesson = _get_next_lesson(request.user, lesson) if completed else None
 
         return Response({
             'attempt_id': attempt.id,
             'score': score,
             'correct': correct_count,
             'total': total,
+            'completed': completed,
             'results': results,
+            'next_lesson_id': next_lesson.id if next_lesson else None,
+            'next_lesson_title': next_lesson.title if next_lesson else None,
         })
 
 
@@ -211,6 +255,65 @@ class ExerciseDetailView(APIView):
         return Response(status=204)
 
 
+class ExerciseAssetLibraryView(APIView):
+    """Read-only local book/audio browser used by the structured admin editor."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        if request.user.role != 'admin':
+            return Response({'detail': 'Forbidden'}, status=403)
+
+        kind = request.query_params.get('kind', 'book')
+        query = request.query_params.get('q', '').strip().lower()
+        if kind == 'book':
+            return Response(self._book_pages(query))
+        if kind == 'audio':
+            return Response(self._audio_files(query, request.query_params.get('unit')))
+        return Response({'detail': 'kind must be book or audio'}, status=400)
+
+    @staticmethod
+    def _book_pages(query):
+        book_dir = Path(settings.BASE_DIR) / 'static' / 'book'
+        rows = []
+        for path in sorted(book_dir.glob('*.jpg')):
+            match = re.search(r'page-(\d+)\.jpg$', path.name, re.IGNORECASE)
+            if not match:
+                continue
+            page_number = int(match.group(1))
+            if query and query not in str(page_number) and query not in path.name.lower():
+                continue
+            rows.append({
+                'name': path.name,
+                'page_number': page_number,
+                'url': f'/static/book/{path.name}',
+            })
+        return {'kind': 'book', 'count': len(rows), 'results': rows}
+
+    @staticmethod
+    def _audio_files(query, unit):
+        audio_dir = Path(settings.BASE_DIR) / 'static' / 'audio'
+        unit_value = str(unit or '').strip()
+        search_root = audio_dir / unit_value if unit_value and unit_value.isdigit() else audio_dir
+        if not search_root.exists():
+            return {'kind': 'audio', 'count': 0, 'results': []}
+
+        rows = []
+        for path in sorted(search_root.rglob('*.mp3')):
+            relative = path.relative_to(audio_dir)
+            haystack = str(relative).lower()
+            if query and query not in haystack:
+                continue
+            rows.append({
+                'name': path.name,
+                'track': path.stem.replace('_', '.'),
+                'unit': relative.parts[0] if len(relative.parts) > 1 else '',
+                'url': f'/static/audio/{relative.as_posix()}',
+            })
+            if len(rows) >= 250:
+                break
+        return {'kind': 'audio', 'count': len(rows), 'results': rows}
+
+
 # ── Exercise content normalizers ──────────────────────────────────────────────
 # Each normalizer handles both content formats (sentences/items) used in the project.
 
@@ -263,6 +366,11 @@ def _listening_questions(content):
     return []
 
 
+def _scorable_rows(rows):
+    """The first row is the guided example when an exercise has real work after it."""
+    return rows[1:] if len(rows) >= 2 else rows
+
+
 # ── Exercise grading ──────────────────────────────────────────────────────────
 
 def _grade_exercise(exercise, user_answer):
@@ -282,7 +390,7 @@ def _grade_exercise(exercise, user_answer):
     etype = exercise.type
 
     if etype == 'choose_correct':
-        sentences = _choose_correct_sentences(content)
+        sentences = _scorable_rows(_choose_correct_sentences(content))
         user_answers = user_answer.get('answers', [])
         if not sentences:
             return False, 0
@@ -293,8 +401,8 @@ def _grade_exercise(exercise, user_answer):
         score = round((correct_count / len(sentences)) * 100)
         return score == 100, score
 
-    if etype == 'fill_blank':
-        sentences = _fill_blank_sentences(content)
+    if etype == 'fill_blank' or (etype == 'reading' and content.get('sentences')):
+        sentences = _scorable_rows(_fill_blank_sentences(content))
         user_answers = user_answer.get('answers', [])
         if not sentences:
             return False, 0
@@ -315,14 +423,16 @@ def _grade_exercise(exercise, user_answer):
             left = content['left']
             right = content['right']
             correct_pairs = content.get('pairs', list(range(len(left))))  # pairs[i] = right orig idx
-            total = len(left)
+            start = 1 if len(left) >= 2 else 0
+            total = len(left) - start
             user_matches = user_answer.get('matches', {})  # {"leftIdx": rightOrigIdx}
             correct_count = sum(
-                1 for i in range(total)
+                1 for i in range(start, len(left))
                 if str(i) in user_matches and int(user_matches[str(i)]) == correct_pairs[i]
             )
         else:
             obj_pairs = content.get('pairs', [])  # [{left:"...", right:"..."}]
+            obj_pairs = _scorable_rows(obj_pairs)
             total = len(obj_pairs)
             correct_map = {p['left']: p['right'] for p in obj_pairs}
             user_matches_list = user_answer.get('matches', [])  # [{left:"...", right:"..."}]
@@ -335,8 +445,8 @@ def _grade_exercise(exercise, user_answer):
         score = round((correct_count / total) * 100)
         return score == 100, score
 
-    if etype == 'listening':
-        questions = _listening_questions(content)
+    if etype in ('listening', 'reading'):
+        questions = _scorable_rows(_listening_questions(content))
         user_answers = user_answer.get('answers', {})  # {"qIdx": selectedOptionIdx}
         if not questions:
             return False, 0
@@ -364,7 +474,7 @@ def _build_feedback(exercise, user_answer, is_correct):
             'correct_indices': [s.get('correct', s.get('correct_index', 0)) for s in sentences],
         }
 
-    if etype == 'fill_blank':
+    if etype == 'fill_blank' or (etype == 'reading' and content.get('sentences')):
         sentences = _fill_blank_sentences(content)
         return {
             'correct_answers': [s.get('answer') for s in sentences],
@@ -380,8 +490,8 @@ def _build_feedback(exercise, user_answer, is_correct):
             }
         return {'correct_pairs': content.get('pairs', [])}
 
-    if etype == 'listening':
-        questions = _listening_questions(content)
+    if etype in ('listening', 'reading'):
+        questions = _scorable_rows(_listening_questions(content))
         return {
             'correct_indices': [q.get('correct', q.get('correct_index', 0)) for q in questions],
         }

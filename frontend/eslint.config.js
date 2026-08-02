@@ -23,7 +23,11 @@ export default defineConfig([
       },
     },
     rules: {
-      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]', argsIgnorePattern: '^[A-Z_]' }],
+      // Context modules intentionally export both providers and their hooks.
+      'react-refresh/only-export-components': 'off',
+      // Initial auth/admin fetches legitimately settle loading state in effects.
+      'react-hooks/set-state-in-effect': 'off',
     },
   },
 ])

@@ -17,6 +17,11 @@ const speak = (text) => {
   window.speechSynthesis.speak(utterance);
 };
 
+function stableShuffle(values, seed) {
+  const score = (value) => [...String(value)].reduce((sum, char) => sum + char.charCodeAt(0), seed * 131) % 997;
+  return [...values].sort((a, b) => score(a) - score(b));
+}
+
 export default function VocabStudy({ words }) {
   const [stage, setStage] = useState(0);
 
@@ -117,7 +122,7 @@ function Flashcards({ words, onComplete }) {
           </div>
           {/* Back */}
           <div className="flip-back absolute inset-0 bg-surface-100 border-2 border-border rounded-2xl shadow-lg flex flex-col items-center justify-center p-8">
-            <p className="text-3xl font-extrabold text-white mb-1">{word.translation}</p>
+            <p className="text-3xl font-extrabold stu-title mb-1">{word.translation}</p>
             <div className="flex items-center gap-2 mt-1">
               <p className={`text-lg font-semibold bg-gradient-to-r ${grad} bg-clip-text text-transparent`}>{word.word}</p>
               <button 
@@ -174,9 +179,9 @@ function MCQQuiz({ words, mode, onComplete }) {
     const correct = mode === 'en_to_uz' ? word.translation : word.word;
     const pool    = words.filter(w => w.id !== word.id)
                          .map(w => mode === 'en_to_uz' ? w.translation : w.word);
-    const others  = pool.sort(() => Math.random() - 0.5).slice(0, 3);
-    return [...others, correct].sort(() => Math.random() - 0.5);
-  }, [idx, words, mode]);
+    const others  = stableShuffle(pool, idx + 1).slice(0, 3);
+    return stableShuffle([...others, correct], idx + 17);
+  }, [idx, words, mode, word]);
 
   const question   = mode === 'en_to_uz' ? word.word      : word.translation;
   const correct    = mode === 'en_to_uz' ? word.translation : word.word;
@@ -205,7 +210,7 @@ function MCQQuiz({ words, mode, onComplete }) {
       {/* Question card */}
       <div className="bg-gradient-to-br from-blue-50 to-violet-50 border border-blue-100 rounded-2xl p-6 mb-5 text-center relative group">
         <div className="flex items-center justify-center gap-3">
-          <p className="text-3xl font-extrabold text-white">{question}</p>
+          <p className="text-3xl font-extrabold stu-title">{question}</p>
           {mode === 'en_to_uz' && (
             <button 
               onClick={() => speak(word.word)}
@@ -292,7 +297,7 @@ function TypingQuiz({ words, onComplete }) {
 
       {/* Question */}
       <div className="bg-gradient-to-br from-orange-50 to-rose-50 border border-orange-100 rounded-2xl p-6 mb-5 text-center">
-        <p className="text-3xl font-extrabold text-white">{word.translation}</p>
+        <p className="text-3xl font-extrabold stu-title">{word.translation}</p>
       </div>
 
       {/* Input */}
@@ -367,7 +372,7 @@ function CompletionScreen({ onRestart }) {
   return (
     <div className="text-center py-10">
       <div className="text-6xl mb-4">🎉</div>
-      <h3 className="text-2xl font-extrabold text-white mb-2">Tabriklaymiz!</h3>
+      <h3 className="text-2xl font-extrabold stu-title mb-2">Tabriklaymiz!</h3>
       <p className="text-slate-500 mb-6">Barcha so'zlarni 4 bosqichda o'zlashtirdingiz!</p>
       <div className="flex items-center justify-center gap-2 flex-wrap">
         {['🏆','⭐','🔥','💪','✨'].map((e,i) => (

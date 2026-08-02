@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useGame } from '../context/GameContext';
 import api from '../api';
-import { BookOpen, LayoutDashboard, BookMarked, BarChart2, Trophy, LogOut, Shield, Sun, Moon } from 'lucide-react';
+import { BookOpen, LayoutDashboard, BookMarked, BarChart2, Trophy, LogOut, Sun, Moon, Zap } from 'lucide-react';
 
 const AVATAR_COLORS = [
   'from-violet-500 to-purple-600',
@@ -14,28 +15,35 @@ const AVATAR_COLORS = [
   'from-yellow-400 to-orange-400',
 ];
 
+const NAV_ITEMS = [
+  { to: '/dashboard', icon: LayoutDashboard, label: 'Bosh sahifa', exact: true },
+  { to: '/my-lessons', icon: BookMarked, label: 'Darslarim' },
+  { to: '/results', icon: BarChart2, label: 'Natijalar' },
+  { to: '/leaderboard', icon: Trophy, label: 'Reyting' },
+];
+
 function getAvatarColor(username = '') {
   let sum = 0;
   for (let i = 0; i < username.length; i++) sum += username.charCodeAt(i);
   return AVATAR_COLORS[sum % AVATAR_COLORS.length];
 }
 
-function ProgressRing({ percent, size = 40, stroke = 3 }) {
+function ProgressRing({ percent, size = 36, stroke = 2.5 }) {
   const r = (size - stroke * 2) / 2;
   const circ = 2 * Math.PI * r;
   const offset = circ - (percent / 100) * circ;
   return (
     <svg width={size} height={size} className="-rotate-90">
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#2a3548" strokeWidth={stroke} />
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--ring-track)" strokeWidth={stroke} />
       <circle
         cx={size / 2} cy={size / 2} r={r} fill="none"
-        stroke="url(#pg)" strokeWidth={stroke}
+        stroke="url(#navRing)" strokeWidth={stroke}
         strokeDasharray={circ} strokeDashoffset={offset}
         strokeLinecap="round"
         style={{ transition: 'stroke-dashoffset 0.6s ease' }}
       />
       <defs>
-        <linearGradient id="pg" x1="0%" y1="0%" x2="100%" y2="0%">
+        <linearGradient id="navRing" x1="0%" y1="0%" x2="100%" y2="0%">
           <stop offset="0%" stopColor="#6366f1" />
           <stop offset="100%" stopColor="#06b6d4" />
         </linearGradient>
@@ -47,6 +55,7 @@ function ProgressRing({ percent, size = 40, stroke = 3 }) {
 export default function Navbar() {
   const { user, logout } = useAuth();
   const { dark, toggle } = useTheme();
+  const { xp } = useGame();
   const navigate = useNavigate();
   const location = useLocation();
   const [progressPct, setProgressPct] = useState(0);
@@ -62,7 +71,6 @@ export default function Navbar() {
   }, [user]);
 
   const handleLogout = () => { logout(); navigate('/login'); };
-  const isActive = (path) => location.pathname.startsWith(path);
 
   if (!user || user.role === 'admin') return null;
 
@@ -72,59 +80,85 @@ export default function Navbar() {
 
   return (
     <nav className="student-nav">
-      <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-        <Link to="/dashboard" className="flex items-center gap-2 shrink-0">
-          <div className="bg-gradient-to-br from-indigo-500 to-violet-600 p-1.5 rounded-xl shadow-lg shadow-indigo-500/20">
-            <BookOpen className="text-white" size={20} />
+      <div className="max-w-6xl mx-auto px-4 h-14 flex items-center gap-4">
+
+        {/* Logo */}
+        <Link to="/dashboard" className="flex items-center gap-2.5 shrink-0">
+          <div className="bg-gradient-to-br from-indigo-500 to-violet-600 p-1.5 rounded-xl shadow-md shadow-indigo-500/25">
+            <BookOpen className="text-white" size={18} />
           </div>
-          <span className="font-extrabold text-white text-lg hidden sm:block">Learn English</span>
+          <span className="font-extrabold stu-title text-base hidden sm:block tracking-tight">Learn English</span>
         </Link>
 
-        <div className="flex items-center gap-1">
-          <NavLink to="/dashboard" icon={<LayoutDashboard size={17} />} label="Bosh sahifa" active={location.pathname === '/dashboard'} />
-          <NavLink to="/my-lessons" icon={<BookMarked size={17} />} label="Darslarim" active={isActive('/my-lessons')} />
-          <NavLink to="/results" icon={<BarChart2 size={17} />} label="Natijalar" active={isActive('/results')} />
-          <NavLink to="/leaderboard" icon={<Trophy size={17} />} label="Reyting" active={isActive('/leaderboard')} />
+        {/* Desktop nav — markazda */}
+        <div className="hidden md:flex flex-1 items-center justify-center">
+          <div className="flex items-center gap-0.5 bg-surface-200/60 rounded-2xl p-1 border border-border">
+            {NAV_ITEMS.map((item) => {
+              const Icon = item.icon;
+              const active = item.exact
+                ? location.pathname === item.to
+                : location.pathname.startsWith(item.to);
+              return (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold transition-all ${
+                    active
+                      ? 'bg-surface-100 text-indigo-600 shadow-sm border border-border'
+                      : 'stu-muted hover:stu-body hover:bg-surface-100/60'
+                  }`}
+                >
+                  <Icon size={15} />
+                  <span className="hidden lg:inline">{item.label}</span>
+                </Link>
+              );
+            })}
+          </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
-          <button onClick={toggle} className="p-2 rounded-xl text-slate-500 hover:text-slate-300 hover:bg-surface-200 transition" title={dark ? 'Kunduzgi' : 'Tungi'}>
-            {dark ? <Sun size={18} /> : <Moon size={18} />}
+        {/* O'ng panel */}
+        <div className="flex items-center gap-1.5 ml-auto shrink-0">
+          {/* XP */}
+          <div className="hidden sm:flex items-center gap-1 bg-violet-500/10 text-violet-600 dark:text-violet-300 px-2.5 py-1 rounded-full text-xs font-bold border border-violet-500/20">
+            <Zap size={12} />
+            {xp}
+          </div>
+
+          {/* Theme toggle */}
+          <button
+            onClick={toggle}
+            className="p-2 rounded-xl stu-muted hover:stu-body hover:bg-surface-200 transition"
+            title={dark ? 'Kunduzgi rejim' : 'Tungi rejim'}
+          >
+            {dark ? <Sun size={17} /> : <Moon size={17} />}
           </button>
+
+          {/* Avatar + progress */}
           <div className="relative flex items-center" title={`Progress: ${progressPct}%`}>
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <ProgressRing percent={progressPct} size={40} stroke={3} />
+              <ProgressRing percent={progressPct} />
             </div>
-            <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${avatarGrad} flex items-center justify-center text-white font-bold text-xs shadow-sm select-none`}>
+            <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${avatarGrad} flex items-center justify-center text-white font-bold text-[10px] shadow-sm select-none`}>
               {initials}
             </div>
           </div>
-          <div className="text-right hidden sm:block">
-            <p className="text-sm font-semibold text-slate-200 leading-tight">{user.full_name || user.username}</p>
-            <p className="text-xs text-slate-500">⭐ {progressPct}%</p>
+
+          <div className="text-right hidden lg:block min-w-0">
+            <p className="text-sm font-semibold stu-title leading-tight truncate max-w-[120px]">
+              {(user.full_name || user.username).split(' ')[0]}
+            </p>
+            <p className="text-[10px] stu-muted">{progressPct}% bajarildi</p>
           </div>
-          <button onClick={handleLogout} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-red-400 transition px-3 py-2 rounded-xl hover:bg-red-500/10">
-            <LogOut size={16} />
-            <span className="hidden sm:inline">Chiqish</span>
+
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-1.5 text-sm stu-muted hover:text-red-500 transition px-2.5 py-2 rounded-xl hover:bg-red-500/10"
+          >
+            <LogOut size={15} />
+            <span className="hidden xl:inline">Chiqish</span>
           </button>
         </div>
       </div>
     </nav>
-  );
-}
-
-function NavLink({ to, icon, label, active }) {
-  return (
-    <Link
-      to={to}
-      className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition ${
-        active
-          ? 'bg-indigo-500/15 text-indigo-300 border border-indigo-500/20'
-          : 'text-slate-400 hover:bg-surface-200 hover:text-slate-200'
-      }`}
-    >
-      {icon}
-      <span className="hidden md:inline">{label}</span>
-    </Link>
   );
 }

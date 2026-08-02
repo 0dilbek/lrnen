@@ -57,21 +57,33 @@ export function GameProvider({ children }) {
   const [streak, setStreak] = useState(0);
   const [loaded, setLoaded] = useState(false);
 
-  useEffect(() => {
-    if (!user || user.role === 'admin') return;
-    api.get('/courses/progress/').then(({ data }) => {
-      const earnedXP    = calcXP(data);
-      const earnedBadges = BADGE_DEFS.filter(b => b.check(data));
-      const currentStreak = updateStreak(user.username);
-      setXP(earnedXP);
-      setBadges(earnedBadges);
-      setStreak(currentStreak);
+  const applyProgress = (data) => {
+    if (!user) return;
+    const earnedXP = calcXP(data);
+    const earnedBadges = BADGE_DEFS.filter((b) => b.check(data));
+    const currentStreak = updateStreak(user.username);
+    setXP(earnedXP);
+    setBadges(earnedBadges);
+    setStreak(currentStreak);
+  };
+
+  const refreshProgress = () => {
+    if (!user || user.role === 'admin') return Promise.resolve();
+    return api.get('/courses/progress/').then(({ data }) => {
+      applyProgress(data);
       setLoaded(true);
     }).catch(() => setLoaded(true));
+  };
+
+  useEffect(() => {
+    if (!user || user.role === 'admin') return;
+    refreshProgress();
+    // refreshProgress intentionally follows the authenticated user lifecycle.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   return (
-    <GameContext.Provider value={{ xp, badges, streak, loaded, BADGE_DEFS }}>
+    <GameContext.Provider value={{ xp, badges, streak, loaded, BADGE_DEFS, refreshProgress }}>
       {children}
     </GameContext.Provider>
   );

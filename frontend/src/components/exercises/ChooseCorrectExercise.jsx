@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { CheckCircle2, XCircle, ChevronRight, RotateCcw } from 'lucide-react';
+import ExampleBadge from './ExampleBadge';
 
 /**
  * content: {
@@ -28,11 +29,11 @@ function normalizeItems(content) {
     });
   }
   if (content?.questions) {
-    return content.questions.map(q => ({
+    return content.questions.map((q) => ({
       before: q.question,
       options: q.options,
-      after: "",
-      correct: q.correct
+      after: '',
+      correct: q.correct,
     }));
   }
   return [];
@@ -40,92 +41,122 @@ function normalizeItems(content) {
 
 export default function ChooseCorrectExercise({ exercise, onComplete }) {
   const sentences = normalizeItems(exercise.content);
-  const [answers, setAnswers] = useState({});
+  const hasExample = sentences.length >= 2;
+  const exampleAnswer = useMemo(
+    () => (hasExample ? { 0: sentences[0].correct } : {}),
+    [hasExample, sentences]
+  );
+
+  const [answers, setAnswers] = useState(() => ({ ...exampleAnswer }));
   const [checked, setChecked] = useState(false);
 
   const select = (idx, optIdx) => {
-    if (checked) return;
+    if (checked || (hasExample && idx === 0)) return;
     setAnswers((a) => ({ ...a, [idx]: optIdx }));
   };
 
-  const allAnswered = sentences.every((_, i) => answers[i] !== undefined);
+  const scorable = hasExample ? sentences.slice(1) : sentences;
+  const allAnswered = scorable.every((_, i) => {
+    const idx = hasExample ? i + 1 : i;
+    return answers[idx] !== undefined;
+  });
 
   const handleCheck = () => {
     setChecked(true);
-    const correct = sentences.filter((s, i) => answers[i] === s.correct).length;
-    if (onComplete) onComplete(correct, sentences.length);
+    const correct = scorable.filter((s, i) => {
+      const idx = hasExample ? i + 1 : i;
+      return answers[idx] === s.correct;
+    }).length;
+    if (onComplete) onComplete(correct, scorable.length);
   };
 
   const handleRetry = () => {
-    setAnswers({});
+    setAnswers({ ...exampleAnswer });
     setChecked(false);
   };
 
   const score = checked
-    ? sentences.filter((s, i) => answers[i] === s.correct).length
+    ? scorable.filter((s, i) => {
+        const idx = hasExample ? i + 1 : i;
+        return answers[idx] === s.correct;
+      }).length
     : null;
 
   return (
     <div className="max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
+      {hasExample && (
+        <p className="text-xs stu-muted mb-4 italic">
+          1-savol namuna — shunday yechiladi. Siz 2-savoldan boshlang.
+        </p>
+      )}
       <div className="space-y-4 mb-8">
         {sentences.map((s, i) => {
+          const isExample = hasExample && i === 0;
           const chosen = answers[i];
           const isCorrect = checked && chosen === s.correct;
-          const isWrong = checked && chosen !== s.correct && chosen !== undefined;
-          
+          const isWrong = checked && !isExample && chosen !== s.correct && chosen !== undefined;
+
           return (
             <div
               key={i}
               className={`group relative overflow-hidden p-5 rounded-2xl border transition-all duration-300 ${
-                isCorrect ? 'bg-emerald-50/50 border-emerald-200 shadow-sm shadow-emerald-100' :
-                isWrong   ? 'bg-rose-50/50 border-rose-200 shadow-sm shadow-rose-100' :
-                chosen !== undefined ? 'bg-indigo-50/30 border-indigo-200 shadow-sm' :
-                            'bg-white/80 border-slate-200 hover:border-indigo-300 hover:shadow-md'
-              } backdrop-blur-sm`}
+                isExample
+                  ? 'bg-amber-500/5 border-amber-500/30'
+                  : isCorrect
+                    ? 'bg-emerald-50/50 border-emerald-200 shadow-sm'
+                    : isWrong
+                      ? 'bg-rose-50/50 border-rose-200 shadow-sm'
+                      : chosen !== undefined
+                        ? 'bg-indigo-50/30 border-indigo-200 shadow-sm'
+                        : 'bg-surface-100 border-border hover:border-indigo-300 hover:shadow-md'
+              }`}
             >
               <div className="flex flex-wrap items-center gap-2">
-                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-slate-100 text-slate-500 text-[10px] font-bold mr-2 group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors">
+                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-surface-200 text-slate-500 text-[10px] font-bold mr-1">
                   {i + 1}
                 </span>
-                
-                {s.before && <span className="text-slate-700 font-medium leading-relaxed">{s.before}</span>}
-                
-                <div className="inline-flex items-center gap-1.5 p-1 bg-slate-100/50 rounded-xl border border-slate-200/60 shadow-inner">
+                {isExample && <ExampleBadge />}
+
+                {s.before && <span className="stu-body font-medium leading-relaxed">{s.before}</span>}
+
+                <div className="inline-flex items-center gap-1.5 p-1 bg-surface-200/60 rounded-xl border border-border shadow-inner">
                   {s.options.map((opt, oi) => {
                     const isSelected = chosen === oi;
-                    const isTheCorrectOne = checked && oi === s.correct;
-                    const isTheWrongOne = checked && isSelected && oi !== s.correct;
-                    
+                    const isTheCorrectOne = (checked || isExample) && oi === s.correct;
+                    const isTheWrongOne = checked && !isExample && isSelected && oi !== s.correct;
+
                     return (
                       <button
                         key={oi}
                         onClick={() => select(i, oi)}
+                        disabled={isExample || checked}
                         className={`px-4 py-1.5 rounded-lg font-semibold text-xs transition-all duration-300 transform active:scale-95 ${
                           isTheCorrectOne
-                            ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-200 scale-105 z-10'
+                            ? 'bg-emerald-500 text-white shadow-lg scale-105 z-10'
                             : isTheWrongOne
-                              ? 'bg-rose-500 text-white shadow-lg shadow-rose-200'
+                              ? 'bg-rose-500 text-white shadow-lg'
                               : isSelected
-                                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200'
+                                ? 'bg-indigo-600 text-white shadow-md'
                                 : checked
-                                  ? 'bg-slate-50 text-slate-400 border-transparent cursor-default'
-                                  : 'bg-white text-slate-600 hover:text-indigo-600 hover:shadow-sm'
-                        }`}
+                                  ? 'bg-surface-100 text-slate-400 cursor-default'
+                                  : 'bg-surface-50 stu-body hover:text-indigo-600 hover:shadow-sm'
+                        } ${isExample ? 'cursor-default' : ''}`}
                       >
                         {opt}
                       </button>
                     );
                   })}
                 </div>
-                
-                {s.after && <span className="text-slate-700 font-medium leading-relaxed">{s.after}</span>}
-                
-                {checked && (
-                  <div className="ml-auto animate-in zoom-in duration-300">
-                    {isCorrect
+
+                {s.after && <span className="stu-body font-medium leading-relaxed">{s.after}</span>}
+
+                {(checked || isExample) && (
+                  <div className="ml-auto">
+                    {isExample || isCorrect
                       ? <CheckCircle2 size={20} className="text-emerald-500" />
-                      : <XCircle size={20} className="text-rose-500" />
-                    }
+                      : isWrong
+                        ? <XCircle size={20} className="text-rose-500" />
+                        : null}
                   </div>
                 )}
               </div>
@@ -134,31 +165,30 @@ export default function ChooseCorrectExercise({ exercise, onComplete }) {
         })}
       </div>
 
-      <div className="flex justify-center border-t border-slate-100 pt-8">
+      <div className="flex justify-center border-t border-border pt-8">
         {!checked ? (
           <button
             onClick={handleCheck}
-            disabled={!allAnswered}
-            className="group flex items-center gap-2 px-8 py-3.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 disabled:cursor-not-allowed text-white rounded-2xl font-bold transition-all duration-300 shadow-xl shadow-indigo-100 hover:shadow-indigo-200 transform hover:-translate-y-0.5 active:translate-y-0"
+            disabled={!allAnswered || scorable.length === 0}
+            className="group flex items-center gap-2 px-8 py-3.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-2xl font-bold transition-all shadow-lg"
           >
             Tekshirish
             <ChevronRight size={18} className="group-hover:translate-x-0.5 transition-transform" />
           </button>
         ) : (
           <div className="flex flex-col items-center gap-5 w-full">
-            <div className="flex items-center gap-3 px-6 py-3 bg-white border border-slate-100 rounded-2xl shadow-sm">
-              <div className={`text-2xl font-black ${score === sentences.length ? 'text-emerald-500' : 'text-amber-500'}`}>
-                {score} / {sentences.length}
+            <div className="flex items-center gap-3 px-6 py-3 student-card">
+              <div className={`text-2xl font-black ${score === scorable.length ? 'text-emerald-500' : 'text-amber-500'}`}>
+                {score} / {scorable.length}
               </div>
-              <div className="h-8 w-px bg-slate-100 mx-2" />
-              <div className="text-sm text-slate-500 font-medium italic">
-                {score === sentences.length ? "Ajoyib natija!" : "Yana urinib ko'ring"}
+              <div className="h-8 w-px bg-border mx-2" />
+              <div className="text-sm stu-muted font-medium italic">
+                {score === scorable.length ? 'Ajoyib natija!' : "Yana urinib ko'ring"}
               </div>
             </div>
-            
             <button
               onClick={handleRetry}
-              className="flex items-center gap-2 px-6 py-2.5 bg-slate-50 hover:bg-white border border-slate-200 text-slate-600 hover:text-indigo-600 rounded-xl text-xs font-bold transition-all duration-300 hover:shadow-md"
+              className="flex items-center gap-2 px-6 py-2.5 bg-surface-200 hover:bg-surface-100 border border-border stu-body hover:text-indigo-600 rounded-xl text-xs font-bold transition-all"
             >
               <RotateCcw size={14} />
               Qayta urinish
@@ -169,4 +199,3 @@ export default function ChooseCorrectExercise({ exercise, onComplete }) {
     </div>
   );
 }
-

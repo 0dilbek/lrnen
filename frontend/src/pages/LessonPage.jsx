@@ -1,10 +1,12 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../api';
-import { ArrowLeft, Send, Trash2, Loader2, CheckCircle, XCircle } from 'lucide-react';
+import { ArrowLeft, Send, Trash2, Loader2, CheckCircle, XCircle, ArrowRight, Home } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useGame } from '../context/GameContext';
 import ExerciseBlock from '../components/exercises/ExerciseBlock';
 import VocabStudy from '../components/vocab/VocabStudy';
+import ExampleBadge from '../components/exercises/ExampleBadge';
 import { formatLessonTitle, formatLessonDescription } from '../utils/lessonDisplay';
 
 function getYoutubeId(url) {
@@ -14,14 +16,15 @@ function getYoutubeId(url) {
 
 function Confetti() {
   const colors = ['#6366f1','#06b6d4','#10b981','#f59e0b','#ec4899','#f97316'];
+  const pseudoRandom = (seed) => ((seed * 9301 + 49297) % 233280) / 233280;
   const pieces = Array.from({ length: 48 }, (_, i) => ({
     id: i,
     color: colors[i % colors.length],
-    left: `${Math.random() * 100}%`,
-    delay: `${Math.random() * 1.5}s`,
-    duration: `${1.8 + Math.random() * 1.2}s`,
-    size: `${8 + Math.random() * 8}px`,
-    rotate: `${Math.random() * 360}deg`,
+    left: `${pseudoRandom(i + 1) * 100}%`,
+    delay: `${pseudoRandom(i + 51) * 1.5}s`,
+    duration: `${1.8 + pseudoRandom(i + 101) * 1.2}s`,
+    size: `${8 + pseudoRandom(i + 151) * 8}px`,
+    rotate: `${pseudoRandom(i + 201) * 360}deg`,
   }));
   return (
     <>
@@ -60,9 +63,10 @@ function SectionTitle({ emoji, title, sub }) {
   );
 }
 
-function QuizResultBanner({ result }) {
+function QuizResultBanner({ result, onNext, onDashboard }) {
   const great = result.score >= 80;
-  const ok    = result.score >= 60;
+  const ok    = result.score >= 60 || result.completed;
+  const completed = result.completed ?? ok;
   return (
     <div className={`relative overflow-hidden mb-6 p-5 rounded-2xl border-2 text-center ${
       great ? 'bg-emerald-500/10 border-emerald-500/40' :
@@ -71,15 +75,37 @@ function QuizResultBanner({ result }) {
     }`}>
       {great && <Confetti />}
       <div className="text-5xl mb-2">{great ? '🏆' : ok ? '⭐' : '💪'}</div>
-      <p className="text-3xl font-extrabold text-white">{result.score}%</p>
-      <p className="text-base font-semibold text-slate-300 mt-1">
+      <p className="text-3xl font-extrabold stu-title">{result.score}%</p>
+      <p className="text-base font-semibold stu-body mt-1">
         {result.correct}/{result.total} ta to'g'ri
       </p>
-      <p className={`text-sm mt-2 font-medium ${great ? 'text-emerald-400' : ok ? 'text-amber-400' : 'text-red-400'}`}>
+      <p className={`text-sm mt-2 font-medium ${great ? 'text-emerald-500' : ok ? 'text-amber-500' : 'text-red-500'}`}>
         {great ? '🎉 Ajoyib! Dars muvaffaqiyatli yakunlandi!' :
          ok    ? '👍 Yaxshi natija! Dars yakunlandi.' :
                  '😅 Qayta urinib ko\'ring — siz uddalaysiz!'}
       </p>
+      {completed && (
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-5">
+          {result.next_lesson_id ? (
+            <button
+              onClick={onNext}
+              className="admin-btn-primary px-6 py-3"
+            >
+              Keyingi dars
+              <ArrowRight size={16} />
+            </button>
+          ) : (
+            <p className="text-sm text-emerald-500 font-semibold">Barcha darslar yakunlandi! 🎓</p>
+          )}
+          <button
+            onClick={onDashboard}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-border stu-muted hover:stu-body text-sm font-semibold transition"
+          >
+            <Home size={16} />
+            Bosh sahifa
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -88,6 +114,7 @@ export default function LessonPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { refreshProgress } = useGame() || {};
 
   const [lesson, setLesson]       = useState(null);
   const [vocab, setVocab]         = useState([]);
@@ -103,6 +130,15 @@ export default function LessonPage() {
   const [answerAnim, setAnswerAnim] = useState({});
   const quizRef = useRef(null);
 
+  // Dars o'zgarganda holatni tozalash
+  useEffect(() => {
+    setQuizResult(null);
+    setSubmitted(false);
+    setAnswers({});
+    setAnswerAnim({});
+    setLoading(true);
+  }, [id]);
+
   useEffect(() => {
     Promise.all([
       api.get(`/courses/lessons/${id}/`),
@@ -117,29 +153,54 @@ export default function LessonPage() {
       }
       setLesson(l.data);
       setVocab(v.data);
-      setQuizzes(q.data);
+      const quizList = q.data || [];
+      setQuizzes(quizList);
       setExercises(ex.data);
       setComments(c.data);
+
+      // Namuna savolni oldindan to'ldirish
+      const initial = {};
+      quizList.forEach((quiz) => {
+        if (quiz.is_example && quiz.correct_option_index != null) {
+          initial[quiz.id] = quiz.correct_option_index;
+        }
+      });
+      setAnswers(initial);
+
       api.post('/courses/progress/', { lesson: Number(id), status: 'in-progress' }).catch(() => {});
     }).catch(() => {
       navigate('/dashboard', { replace: true });
     }).finally(() => setLoading(false));
   }, [id, navigate]);
 
+  const scorableQuizzes = useMemo(
+    () => quizzes.filter((q) => !q.is_example),
+    [quizzes]
+  );
+
+  const allScorableAnswered = scorableQuizzes.every((q) => answers[q.id] !== undefined);
+
   const handleAnswer = (quizId, idx) => {
     if (submitted) return;
+    const quiz = quizzes.find((q) => q.id === quizId);
+    if (quiz?.is_example) return;
     setAnswers((prev) => ({ ...prev, [quizId]: idx }));
   };
 
   const handleSubmitQuiz = async () => {
-    if (Object.keys(answers).length !== quizzes.length) {
+    if (!allScorableAnswered) {
       quizRef.current?.scrollIntoView({ behavior: 'smooth' });
       return;
     }
     setSubmitting(true);
     const payload = {
       lesson_id: Number(id),
-      answers: quizzes.map((q) => ({ quiz_id: q.id, selected_index: answers[q.id] })),
+      answers: quizzes.map((q) => ({
+        quiz_id: q.id,
+        selected_index: q.is_example
+          ? (q.correct_option_index ?? answers[q.id])
+          : answers[q.id],
+      })),
     };
     try {
       const { data } = await api.post('/quiz/submit/', payload);
@@ -150,6 +211,9 @@ export default function LessonPage() {
       setAnswerAnim(anim);
       setQuizResult(data);
       setSubmitted(true);
+      if (data.completed) {
+        refreshProgress?.();
+      }
     } finally {
       setSubmitting(false);
     }
@@ -180,6 +244,8 @@ export default function LessonPage() {
   const ytId = getYoutubeId(lesson.video_url);
   const displayTitle = formatLessonTitle(lesson.title);
   const displayDesc = formatLessonDescription(lesson.description);
+  const readingExercises = exercises.filter((exercise) => exercise.type === 'reading');
+  const practiceExercises = exercises.filter((exercise) => exercise.type !== 'reading');
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
@@ -192,7 +258,7 @@ export default function LessonPage() {
       </button>
 
       <div className="mb-6">
-        <h1 className="text-3xl font-extrabold text-white leading-tight">{displayTitle}</h1>
+        <h1 className="text-3xl font-extrabold stu-title leading-tight">{displayTitle}</h1>
       </div>
 
       <section className="mb-8">
@@ -230,11 +296,22 @@ export default function LessonPage() {
         </section>
       )}
 
-      {exercises.length > 0 && (
+      {readingExercises.length > 0 && (
         <section className="mb-8">
-          <SectionTitle emoji="✏️" title="Mashqlar" sub={`${exercises.length} ta mashq`} />
+          <SectionTitle emoji="📚" title="Reading" sub={`${readingExercises.length} ta matn — avval sahifani o'qing, keyin topshiriqni bajaring`} />
+          <div className="space-y-4">
+            {readingExercises.map((exercise, index) => (
+              <ExerciseBlock key={exercise.id} exercise={exercise} index={index} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {practiceExercises.length > 0 && (
+        <section className="mb-8">
+          <SectionTitle emoji="✏️" title="Mashqlar" sub={`${practiceExercises.length} ta mashq`} />
           <div className="space-y-3">
-            {exercises.map((ex, i) => (
+            {practiceExercises.map((ex, i) => (
               <ExerciseBlock key={ex.id} exercise={ex} index={i} />
             ))}
           </div>
@@ -245,16 +322,30 @@ export default function LessonPage() {
         <section className="mb-8" ref={quizRef}>
           <SectionTitle emoji="📝" title="Test" sub={`${quizzes.length} ta savol`} />
 
-          {quizResult && <QuizResultBanner result={quizResult} />}
+          {quizResult && (
+            <QuizResultBanner
+              result={quizResult}
+              onNext={() => navigate(`/lessons/${quizResult.next_lesson_id}`)}
+              onDashboard={() => navigate('/dashboard')}
+            />
+          )}
+
+          {quizzes.some((q) => q.is_example) && !submitted && (
+            <p className="text-xs stu-muted mb-4 italic">
+              1-savol namuna — shunday yechiladi. Siz 2-savoldan boshlang.
+            </p>
+          )}
 
           <div className="space-y-4">
             {quizzes.map((quiz, qi) => {
               const result = quizResult?.results?.find((r) => r.quiz_id === quiz.id);
               const anim = answerAnim[quiz.id];
+              const isExample = quiz.is_example;
               return (
                 <div
                   key={quiz.id}
                   className={`student-card p-5 border-2 transition-all duration-300 ${
+                    isExample ? 'border-amber-500/30 bg-amber-500/5' :
                     anim === 'correct' ? 'border-emerald-500/50' :
                     anim === 'wrong'   ? 'border-red-500/40' :
                                         'border-border'
@@ -262,34 +353,40 @@ export default function LessonPage() {
                 >
                   <div className="flex items-start gap-3 mb-4">
                     <span className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold text-white ${
-                      anim === 'correct' ? 'bg-emerald-500' :
+                      isExample || anim === 'correct' ? 'bg-emerald-500' :
                       anim === 'wrong'   ? 'bg-red-500' :
                                           'bg-surface-300'
                     }`}>
                       {qi + 1}
                     </span>
-                    <p className="font-semibold text-white text-base leading-snug">{quiz.question}</p>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        {isExample && <ExampleBadge />}
+                      </div>
+                      <p className="font-semibold stu-title text-base leading-snug">{quiz.question}</p>
+                    </div>
                   </div>
 
                   <div className="space-y-2 pl-10">
                     {quiz.options.map((opt, idx) => {
                       const isSelected = answers[quiz.id] === idx;
-                      const isCorrect  = result && idx === result.correct_option_index;
-                      const isWrong    = result && isSelected && !result.is_correct;
+                      const exampleCorrect = isExample && idx === quiz.correct_option_index;
+                      const isCorrect  = (result && idx === result.correct_option_index) || exampleCorrect;
+                      const isWrong    = result && isSelected && !result.is_correct && !isExample;
 
                       let cls = 'student-quiz-option';
-                      if (!submitted && isSelected) cls += ' selected';
-                      if (submitted && isCorrect)   cls += ' correct';
-                      if (submitted && isWrong)     cls += ' wrong';
+                      if (!submitted && isSelected && !isExample) cls += ' selected';
+                      if ((submitted || isExample) && isCorrect) cls += ' correct';
+                      if (submitted && isWrong) cls += ' wrong';
 
                       return (
                         <button
                           key={idx}
                           onClick={() => handleAnswer(quiz.id, idx)}
-                          disabled={submitted}
+                          disabled={submitted || isExample}
                           className={cls}
                         >
-                          {submitted && isCorrect && <CheckCircle size={16} className="text-emerald-400 shrink-0" />}
+                          {(submitted || isExample) && isCorrect && <CheckCircle size={16} className="text-emerald-500 shrink-0" />}
                           {submitted && isWrong   && <XCircle    size={16} className="text-red-400 shrink-0" />}
                           <span>{String.fromCharCode(65 + idx)}. {opt}</span>
                         </button>
@@ -304,12 +401,12 @@ export default function LessonPage() {
           {!submitted && (
             <button
               onClick={handleSubmitQuiz}
-              disabled={submitting || Object.keys(answers).length !== quizzes.length}
+              disabled={submitting || !allScorableAnswered}
               className="mt-6 w-full sm:w-auto admin-btn-primary px-8 py-3.5 disabled:opacity-50"
             >
               {submitting
                 ? <><Loader2 className="animate-spin" size={18} /> Tekshirilmoqda...</>
-                : <>📨 Testni yakunlash ({Object.keys(answers).length}/{quizzes.length})</>
+                : <>📨 Testni yakunlash ({scorableQuizzes.filter((q) => answers[q.id] !== undefined).length}/{scorableQuizzes.length})</>
               }
             </button>
           )}

@@ -36,8 +36,8 @@ export default function LeaderboardPage() {
     <div className="max-w-2xl mx-auto px-4 py-8">
       <div className="text-center mb-8">
         <div className="text-5xl mb-3">🏆</div>
-        <h1 className="text-2xl font-extrabold text-white">Reyting jadvali</h1>
-        <p className="text-slate-400 mt-1">Eng ko'p XP to'plagan o'quvchilar</p>
+        <h1 className="text-2xl font-extrabold stu-title">Reyting jadvali</h1>
+        <p className="stu-muted mt-1">Eng ko'p XP to'plagan o'quvchilar</p>
       </div>
 
       {top3.length > 0 && (
@@ -52,7 +52,7 @@ export default function LeaderboardPage() {
         <div className="bg-indigo-500/10 border-2 border-indigo-500/30 rounded-2xl px-5 py-4 mb-6 flex items-center gap-4">
           <span className="text-2xl font-extrabold text-indigo-400">#{myEntry.rank}</span>
           <div className="flex-1">
-            <p className="font-bold text-white">Siz 👤</p>
+            <p className="font-bold stu-title">Siz 👤</p>
             <p className="text-sm text-slate-400">@{myEntry.username}</p>
           </div>
           <div className="text-right">
@@ -79,7 +79,7 @@ export default function LeaderboardPage() {
                     {(entry.full_name || entry.username)[0].toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className={`font-semibold truncate ${isMe ? 'text-indigo-300' : 'text-white'}`}>
+                    <p className={`font-semibold truncate ${isMe ? 'text-indigo-600' : 'stu-title'}`}>
                       {entry.full_name || entry.username} {isMe && '👤'}
                     </p>
                     <p className="text-xs text-slate-500">@{entry.username}</p>
@@ -114,7 +114,7 @@ function PodiumCard({ entry, rank, isMe, tall }) {
       <div className={`w-14 h-14 rounded-full bg-gradient-to-br ${style.bg} flex items-center justify-center font-extrabold text-xl text-white shadow-lg mb-2 ${isMe ? 'ring-4 ring-indigo-400' : ''}`}>
         {(entry.full_name || entry.username)[0].toUpperCase()}
       </div>
-      <p className="text-xs font-bold text-slate-300 text-center max-w-[72px] truncate">
+      <p className="text-xs font-bold stu-muted text-center max-w-[72px] truncate">
         {entry.full_name?.split(' ')[0] || entry.username}
       </p>
       <div className={`mt-2 flex flex-col items-center justify-end bg-gradient-to-t ${style.bg} rounded-t-xl w-20 ${tall ? 'h-28' : 'h-20'} shadow-md`}>

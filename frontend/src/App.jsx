@@ -44,7 +44,7 @@ function Layout({ children }) {
   return (
     <div className="min-h-screen bg-surface">
       <Navbar />
-      <main className="pb-16 sm:pb-0">{children}</main>
+      <main className="pb-16 md:pb-0">{children}</main>
       <MobileNav />
     </div>
   );

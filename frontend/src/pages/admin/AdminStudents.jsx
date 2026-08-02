@@ -56,7 +56,7 @@ function DarkModal({ title, onClose, children }) {
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-surface-100 border border-border rounded-2xl shadow-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-lg font-bold text-white">{title}</h2>
+          <h2 className="text-lg font-bold admin-text-title">{title}</h2>
           <button onClick={onClose} className="text-slate-500 hover:text-slate-300 transition">
             <X size={20} />
           </button>
@@ -229,7 +229,7 @@ export default function AdminStudents() {
       {changePassFor && <ChangePasswordModal student={changePassFor} onClose={() => setChangePassFor(null)} />}
 
       <div className="flex items-center justify-between mb-6">
-        <p className="text-sm text-slate-400">Jami: <span className="text-white font-semibold">{students.length}</span> ta</p>
+        <p className="text-sm admin-text-muted">Jami: <span className="admin-text-title font-semibold">{students.length}</span> ta</p>
         <button onClick={() => setShowAdd(true)} className="admin-btn-primary">
           <UserPlus size={18} /> O'quvchi qo'shish
         </button>
@@ -259,7 +259,7 @@ export default function AdminStudents() {
                 {(student.full_name || student.username)[0].toUpperCase()}
               </div>
               <div className="flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/admin/students/${student.id}`)}>
-                <p className="font-medium text-white">{student.full_name || '—'}</p>
+                <p className="font-medium admin-text-title">{student.full_name || '—'}</p>
                 <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                   <p className="text-sm text-slate-500">@{student.username}</p>
                   {student.levels?.map((lvl) => <LevelBadge key={lvl.slug} level={lvl} />)}

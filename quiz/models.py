@@ -19,6 +19,7 @@ class Exercise(models.Model):
         ('fill_blank', "Bo'sh joy to'ldirish"),
         ('matching', 'Moslashtirish'),
         ('listening', 'Listening'),
+        ('reading', 'Reading'),
         ('speaking', 'Speaking'),
     ]
     lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE, related_name='exercises')

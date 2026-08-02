@@ -139,6 +139,17 @@ def _is_lesson_locked(user, lesson, ordered_lessons=None, completed_ids=None):
     return True
 
 
+def _get_next_lesson(user, lesson):
+    """Berilgan darsdan keyingi dars (order bo'yicha)."""
+    ordered = list(_student_lessons_queryset(user))
+    for i, l in enumerate(ordered):
+        if l.id == lesson.id:
+            if i + 1 < len(ordered):
+                return ordered[i + 1]
+            return None
+    return None
+
+
 class LessonListView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -162,26 +173,25 @@ class LessonListView(APIView):
 
         lessons = list(qs.order_by('order', 'id'))
 
-        if request.user.role == 'student':
-            visible_ids = _get_visible_lesson_ids(request.user, lessons)
-            lessons = [l for l in lessons if l.id in visible_ids]
-
-        lesson_ids = [l.id for l in lessons]
+        # Ro'yxatda barcha biriktirilgan darslar ko'rinadi. Kelajakdagi darslar
+        # yashirilmaydi — UI ularni yo'l xaritasida qulflangan holda chiqaradi.
+        # Dars detail endpointidagi tekshiruv bevosita kirishni hamon bloklaydi.
+        full_ordered = list(_student_lessons_queryset(request.user)) if request.user.role == 'student' else lessons
+        full_ids = [l.id for l in full_ordered]
         completed_ids = set()
-        if request.user.role == 'student' and lesson_ids:
+        if request.user.role == 'student' and full_ids:
             completed_ids = set(
                 UserProgress.objects.filter(
-                    user=request.user, lesson_id__in=lesson_ids, status='completed'
+                    user=request.user, lesson_id__in=full_ids, status='completed'
                 ).values_list('lesson_id', flat=True)
             )
-        ordered = lessons
 
         data = LessonSerializer(lessons, many=True).data
         result = []
         for lesson, row in zip(lessons, data):
             row = dict(row)
             row['is_locked'] = _is_lesson_locked(
-                request.user, lesson, ordered, completed_ids
+                request.user, lesson, full_ordered, completed_ids
             )
             result.append(row)
         return Response(result)
@@ -218,6 +228,10 @@ class LessonDetailView(APIView):
         data = dict(LessonSerializer(obj).data)
         ordered = list(_student_lessons_queryset(request.user)) if request.user.role == 'student' else [obj]
         data['is_locked'] = _is_lesson_locked(request.user, obj, ordered)
+
+        next_lesson = _get_next_lesson(request.user, obj) if request.user.role == 'student' else None
+        data['next_lesson_id'] = next_lesson.id if next_lesson else None
+        data['next_lesson_title'] = next_lesson.title if next_lesson else None
         return Response(data)
 
     def put(self, request, pk):
@@ -310,7 +324,12 @@ class UserProgressView(APIView):
             user=request.user,
             lesson=lesson,
         )
-        serializer = UserProgressSerializer(progress, data=request.data, partial=True)
+        # Yakunlangan darsni qayta "jarayonda" ga tushirmaslik
+        payload = dict(request.data)
+        if progress.status == 'completed' and payload.get('status') == 'in-progress':
+            payload.pop('status', None)
+
+        serializer = UserProgressSerializer(progress, data=payload, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)

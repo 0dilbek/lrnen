@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { MousePointer, PenLine, GitMerge, Headphones, Mic, ChevronDown, ChevronUp } from 'lucide-react';
+import { MousePointer, PenLine, GitMerge, Headphones, Mic, BookOpen, ChevronDown, ChevronUp } from 'lucide-react';
 import ChooseCorrectExercise from './ChooseCorrectExercise';
 import FillBlankExercise from './FillBlankExercise';
 import MatchingExercise from './MatchingExercise';
 import ListeningExercise from './ListeningExercise';
+import ReadingExercise from './ReadingExercise';
 
 const TYPE_META = {
   choose_correct: {
@@ -26,6 +27,11 @@ const TYPE_META = {
     icon: Headphones,
     color: 'text-teal-300 bg-teal-500/15 border-teal-500/30',
   },
+  reading: {
+    label: 'Reading',
+    icon: BookOpen,
+    color: 'text-indigo-300 bg-indigo-500/15 border-indigo-500/30',
+  },
   speaking: {
     label: 'Speaking',
     icon: Mic,
@@ -33,7 +39,7 @@ const TYPE_META = {
   },
 };
 
-export default function ExerciseBlock({ exercise, index }) {
+export default function ExerciseBlock({ exercise }) {
   const [open, setOpen] = useState(true);
   const [result, setResult] = useState(null);
 
@@ -53,6 +59,7 @@ export default function ExerciseBlock({ exercise, index }) {
     fill_blank: FillBlankExercise,
     matching: MatchingExercise,
     listening: ListeningExercise,
+    reading: ReadingExercise,
   }[exercise.type];
 
   return (

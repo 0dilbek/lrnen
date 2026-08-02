@@ -30,6 +30,35 @@ class ExerciseSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('content must be a JSON object')
         return value
 
+    def validate(self, attrs):
+        """Validate the structured editors without breaking legacy imported rows."""
+        attrs = super().validate(attrs)
+        exercise_type = attrs.get('type', getattr(self.instance, 'type', None))
+        content = attrs.get('content', getattr(self.instance, 'content', {})) or {}
+
+        if exercise_type == 'reading':
+            pages = content.get('pages', [])
+            questions = content.get('questions') or content.get('sentences') or []
+            if not isinstance(pages, list) or not pages:
+                raise serializers.ValidationError({
+                    'content': "Reading uchun kamida bitta kitob sahifasini tanlang."
+                })
+            if not isinstance(questions, list) or len(questions) < 2:
+                raise serializers.ValidationError({
+                    'content': "Reading uchun 1 ta namuna va kamida 1 ta savol kiriting."
+                })
+
+        # New listening entries should have playable audio. Existing imported
+        # records remain editable through partial updates until they are cleaned.
+        if exercise_type == 'listening' and not self.instance:
+            audio_url = attrs.get('audio_url')
+            if not audio_url:
+                raise serializers.ValidationError({
+                    'audio_url': "Listening uchun audio fayl yoki URL tanlang."
+                })
+
+        return attrs
+
 
 # ── Attempt serializers ───────────────────────────────────────────────────────
 
@@ -98,6 +127,7 @@ class ExerciseAttemptSerializer(serializers.ModelSerializer):
             'fill_blank': "Bo'sh joy to'ldirish",
             'matching': 'Moslashtirish',
             'listening': 'Listening',
+            'reading': 'Reading',
             'speaking': 'Speaking',
         }
         return labels.get(obj.exercise_type, obj.exercise_type)
