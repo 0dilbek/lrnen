@@ -227,6 +227,61 @@ def _student_lessons_queryset(user, base_qs=None):
     )
 
 
+def _student_level_ids(user):
+    level_ids = list(user.levels.values_list('id', flat=True))
+    if level_ids:
+        return level_ids
+    default_level_id = Level.objects.order_by('order', 'id').values_list('id', flat=True).first()
+    return [default_level_id] if default_level_id else []
+
+
+def _release_gate_context(user):
+    """Return the admin-controlled lesson ceiling for each student level."""
+    if is_platform_admin(user):
+        return {}
+
+    context = {}
+    levels = Level.objects.filter(id__in=_student_level_ids(user)).select_related('current_lesson')
+    for level in levels:
+        current = level.current_lesson
+        if current is None or not current.levels.filter(id=level.id).exists():
+            current = level.lessons.order_by('order', 'id').first()
+        context[level.id] = (current.order, current.id) if current else None
+    return context
+
+
+def _is_release_locked(user, lesson, release_context=None):
+    """True when a lesson is ahead of the administrator's current lesson."""
+    if is_platform_admin(user):
+        return False
+    release_context = release_context if release_context is not None else _release_gate_context(user)
+    if not release_context:
+        return False
+    lesson_level_ids = {level.id for level in lesson.levels.all()}
+    applicable = [
+        ceiling for level_id, ceiling in release_context.items()
+        if level_id in lesson_level_ids
+    ]
+    if not applicable:
+        return True
+    lesson_position = (lesson.order, lesson.id)
+    return not any(ceiling is not None and lesson_position <= ceiling for ceiling in applicable)
+
+
+def _lesson_locked_reason(user, lesson, ordered_lessons=None, completed_ids=None, release_context=None):
+    if _is_release_locked(user, lesson, release_context):
+        return "Bu dars administrator tomonidan hali ochilmagan."
+    if _is_lesson_locked(
+        user,
+        lesson,
+        ordered_lessons=ordered_lessons,
+        completed_ids=completed_ids,
+        release_context=release_context,
+    ):
+        return "Oldingi dars testidan kamida 60% oling."
+    return None
+
+
 def _get_visible_lesson_ids(user, lessons):
     """
     O'quvchi faqat quyidagilarni ko'radi:
@@ -248,7 +303,10 @@ def _get_visible_lesson_ids(user, lessons):
     completed_ids = set(progress.filter(status='completed').values_list('lesson_id', flat=True))
 
     visible = set()
+    release_context = _release_gate_context(user)
     for i, lesson in enumerate(ordered):
+        if _is_release_locked(user, lesson, release_context):
+            continue
         if i == 0:
             visible.add(lesson.id)
             if lesson.id not in completed_ids:
@@ -265,10 +323,15 @@ def _get_visible_lesson_ids(user, lessons):
     return visible
 
 
-def _is_lesson_locked(user, lesson, ordered_lessons=None, completed_ids=None):
+def _is_lesson_locked(
+    user, lesson, ordered_lessons=None, completed_ids=None, release_context=None
+):
     """Oldingi dars yakunlanmagan bo'lsa bloklangan."""
     if is_platform_admin(user):
         return False
+
+    if _is_release_locked(user, lesson, release_context):
+        return True
 
     if ordered_lessons is None:
         ordered_lessons = list(_student_lessons_queryset(user))
@@ -297,6 +360,57 @@ def _get_next_lesson(user, lesson):
                 return ordered[i + 1]
             return None
     return None
+
+
+def _release_setting_row(level, request):
+    lessons = list(level.lessons.order_by('order', 'id'))
+    current = level.current_lesson if level.current_lesson_id else None
+    if current is None or current not in lessons:
+        current = lessons[0] if lessons else None
+    language = getattr(request.user, 'language', 'kaa')
+    return {
+        'id': level.id,
+        'slug': level.slug,
+        'name': str(level),
+        'current_lesson_id': current.id if current else None,
+        'current_lesson_title': current.localized_title(language) if current else None,
+        'lessons': [
+            {
+                'id': lesson.id,
+                'order': lesson.order,
+                'title': lesson.localized_title(language),
+            }
+            for lesson in lessons
+        ],
+    }
+
+
+class LessonReleaseSettingsView(APIView):
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        levels = Level.objects.select_related('current_lesson').prefetch_related('lessons')
+        return Response([_release_setting_row(level, request) for level in levels])
+
+    def patch(self, request):
+        level_id = request.data.get('level_id')
+        lesson_id = request.data.get('current_lesson_id')
+        try:
+            level = Level.objects.select_related('current_lesson').get(pk=level_id)
+        except (Level.DoesNotExist, TypeError, ValueError):
+            return Response({'detail': 'Daraja topilmadi.'}, status=404)
+        try:
+            lesson = level.lessons.get(pk=lesson_id)
+        except (Lesson.DoesNotExist, TypeError, ValueError):
+            return Response(
+                {'detail': 'Tanlangan dars bu darajaga tegishli emas.'},
+                status=400,
+            )
+
+        level.current_lesson = lesson
+        level.save(update_fields=['current_lesson'])
+        level.refresh_from_db()
+        return Response(_release_setting_row(level, request))
 
 
 class LessonListView(APIView):
@@ -333,18 +447,19 @@ class LessonListView(APIView):
                 ).values_list('lesson_id', flat=True)
             )
 
+        release_context = _release_gate_context(request.user)
         data = LessonSerializer(lessons, many=True, context={'request': request}).data
         result = []
         for lesson, row in zip(lessons, data):
             row = dict(row)
             is_locked = _is_lesson_locked(
                 request.user, lesson, full_ordered, completed_ids
+                , release_context
             )
             row['is_locked'] = is_locked
-            row['locked_reason'] = (
-                "Oldingi dars testidan kamida 60% oling."
-                if is_locked else None
-            )
+            row['locked_reason'] = _lesson_locked_reason(
+                request.user, lesson, full_ordered, completed_ids, release_context
+            ) if is_locked else None
             if is_locked and not is_platform_admin(request.user):
                 # Roadmap locked lessons' names are visible, their media is not.
                 row['video_url'] = None
@@ -382,11 +497,13 @@ class LessonDetailView(APIView):
 
         data = dict(LessonSerializer(obj, context={'request': request}).data)
         ordered = list(_student_lessons_queryset(request.user)) if not is_platform_admin(request.user) else [obj]
-        data['is_locked'] = _is_lesson_locked(request.user, obj, ordered)
-        data['locked_reason'] = (
-            "Oldingi dars testidan kamida 60% oling."
-            if data['is_locked'] else None
+        release_context = _release_gate_context(request.user)
+        data['is_locked'] = _is_lesson_locked(
+            request.user, obj, ordered, release_context=release_context
         )
+        data['locked_reason'] = _lesson_locked_reason(
+            request.user, obj, ordered, release_context=release_context
+        ) if data['is_locked'] else None
         data['unlock_score'] = 60
 
         next_lesson = _get_next_lesson(request.user, obj) if not is_platform_admin(request.user) else None
@@ -424,6 +541,14 @@ class VocabularyListView(APIView):
         lesson_id = request.query_params.get('lesson')
         qs = Vocabulary.objects.all()
         if lesson_id:
+            if not is_platform_admin(request.user):
+                try:
+                    lesson = Lesson.objects.prefetch_related('levels').get(pk=lesson_id)
+                except Lesson.DoesNotExist:
+                    return Response({'detail': 'Lesson not found'}, status=404)
+                ordered = list(_student_lessons_queryset(request.user))
+                if _is_lesson_locked(request.user, lesson, ordered):
+                    return Response({'detail': _lesson_locked_reason(request.user, lesson, ordered)}, status=403)
             qs = qs.filter(lesson_id=lesson_id)
         return Response(
             VocabularySerializer(qs, many=True, context={'request': request}).data
@@ -491,9 +616,10 @@ class UserProgressView(APIView):
         if not is_platform_admin(request.user):
             ordered = list(_student_lessons_queryset(request.user))
             if _is_lesson_locked(request.user, lesson, ordered):
-                return Response({
-                    'detail': "Oldingi dars testidan kamida 60% olish kerak."
-                }, status=403)
+                return Response(
+                    {'detail': _lesson_locked_reason(request.user, lesson, ordered)},
+                    status=403,
+                )
             if request.data.get('status') == 'completed':
                 return Response({
                     'detail': "Dars faqat yakuniy testdan kamida 60% olinganda tugallanadi."

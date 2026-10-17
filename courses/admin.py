@@ -10,7 +10,8 @@ class CategoryAdmin(admin.ModelAdmin):
 
 @admin.register(Level)
 class LevelAdmin(admin.ModelAdmin):
-    list_display = ['slug', '__str__', 'order']
+    list_display = ['slug', '__str__', 'order', 'current_lesson']
+    list_select_related = ['current_lesson']
     ordering = ['order']
 
 

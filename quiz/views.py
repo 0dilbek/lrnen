@@ -138,12 +138,15 @@ class QuizSubmitView(APIView):
             return Response({'detail': 'Lesson not found'}, status=404)
 
         if not is_platform_admin(request.user):
-            from courses.views import _is_lesson_locked, _student_lessons_queryset
+            from courses.views import (
+                _is_lesson_locked, _lesson_locked_reason, _student_lessons_queryset,
+            )
             ordered = list(_student_lessons_queryset(request.user))
             if _is_lesson_locked(request.user, lesson, ordered):
-                return Response({
-                    'detail': "Oldingi dars testidan kamida 60% olish kerak."
-                }, status=403)
+                return Response(
+                    {'detail': _lesson_locked_reason(request.user, lesson, ordered)},
+                    status=403,
+                )
 
         lesson_quizzes = list(Quiz.objects.filter(lesson=lesson).order_by('id'))
         example_quiz_id = lesson_quizzes[0].id if lesson_quizzes else None
@@ -258,8 +261,10 @@ class QuizSubmitView(APIView):
                 },
             )
 
-        from courses.views import _get_next_lesson
+        from courses.views import _get_next_lesson, _is_lesson_locked
         next_lesson = _get_next_lesson(request.user, lesson) if completed else None
+        if next_lesson and _is_lesson_locked(request.user, next_lesson):
+            next_lesson = None
 
         return Response({
             'attempt_id': attempt.id,
@@ -673,12 +678,15 @@ class ExerciseSubmitView(APIView):
             return Response({'detail': 'Exercise not found'}, status=404)
 
         if not is_platform_admin(request.user):
-            from courses.views import _is_lesson_locked, _student_lessons_queryset
+            from courses.views import (
+                _is_lesson_locked, _lesson_locked_reason, _student_lessons_queryset,
+            )
             ordered = list(_student_lessons_queryset(request.user))
             if _is_lesson_locked(request.user, exercise.lesson, ordered):
-                return Response({
-                    'detail': "Oldingi dars testidan kamida 60% olish kerak."
-                }, status=403)
+                return Response(
+                    {'detail': _lesson_locked_reason(request.user, exercise.lesson, ordered)},
+                    status=403,
+                )
 
         is_correct, score = _grade_exercise(exercise, user_answer)
 

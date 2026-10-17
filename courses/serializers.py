@@ -17,10 +17,11 @@ class CategorySerializer(serializers.ModelSerializer):
 
 class LevelSerializer(serializers.ModelSerializer):
     name = serializers.SerializerMethodField()
+    current_lesson_id = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Level
-        fields = ['id', 'slug', 'name', 'order']
+        fields = ['id', 'slug', 'name', 'order', 'current_lesson_id']
 
     def get_name(self, obj):
         return str(obj)

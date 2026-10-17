@@ -28,6 +28,14 @@ class Level(models.Model):
     ]
     slug = models.CharField(max_length=10, choices=LEVEL_CHOICES, unique=True)
     order = models.PositiveIntegerField(default=0)
+    current_lesson = models.ForeignKey(
+        'Lesson',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='released_for_levels',
+        help_text="O'quvchilar shu darsgacha kira oladi. Bo'sh bo'lsa birinchi dars ochiladi.",
+    )
 
     def __str__(self):
         return dict(self.LEVEL_CHOICES).get(self.slug, self.slug)

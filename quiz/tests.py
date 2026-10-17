@@ -231,6 +231,8 @@ class QuizLessonUnlockTests(TestCase):
         self.second = Lesson.objects.create(title='Second lesson', category=category, order=2)
         self.first.levels.add(level)
         self.second.levels.add(level)
+        level.current_lesson = self.second
+        level.save(update_fields=['current_lesson'])
         self.example = Quiz.objects.create(
             lesson=self.first,
             question='Example',

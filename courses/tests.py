@@ -28,6 +28,8 @@ class LessonRoadmapAccessTests(APITestCase):
             )
             lesson.levels.add(self.level)
             self.lessons.append(lesson)
+        self.level.current_lesson = self.lessons[-1]
+        self.level.save(update_fields=['current_lesson'])
         self.client.force_authenticate(self.student)
 
     def test_list_returns_every_assigned_lesson_with_lock_state(self):
@@ -66,6 +68,86 @@ class LessonRoadmapAccessTests(APITestCase):
         self.assertEqual(response.status_code, 404)
 
 
+class LessonReleaseSettingsTests(APITestCase):
+    def setUp(self):
+        self.level = Level.objects.create(slug='a1', order=1)
+        self.other_level = Level.objects.create(slug='a2', order=2)
+        category = Category.objects.create(name='Release course')
+        self.lessons = []
+        for number in range(1, 4):
+            lesson = Lesson.objects.create(
+                title=f'Release lesson {number}', category=category, order=number
+            )
+            lesson.levels.add(self.level)
+            self.lessons.append(lesson)
+        self.other_lesson = Lesson.objects.create(
+            title='Other level lesson', category=category, order=1
+        )
+        self.other_lesson.levels.add(self.other_level)
+        self.student = User.objects.create_user('release-student', role='student')
+        self.student.levels.add(self.level)
+        self.admin = User.objects.create_user('release-admin', role='admin')
+
+    def test_default_gate_opens_only_first_lesson(self):
+        self.client.force_authenticate(self.student)
+
+        response = self.client.get(reverse('lesson_list'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [lesson['is_locked'] for lesson in response.data],
+            [False, True, True],
+        )
+        self.assertEqual(
+            response.data[1]['locked_reason'],
+            'Bu dars administrator tomonidan hali ochilmagan.',
+        )
+
+    def test_admin_can_release_next_lesson_for_one_level(self):
+        UserProgress.objects.create(
+            user=self.student,
+            lesson=self.lessons[0],
+            status='completed',
+            score=100,
+        )
+        self.client.force_authenticate(self.admin)
+        settings_response = self.client.get(reverse('lesson_release_settings'))
+        a1 = next(row for row in settings_response.data if row['id'] == self.level.id)
+        self.assertEqual(a1['current_lesson_id'], self.lessons[0].id)
+
+        update_response = self.client.patch(
+            reverse('lesson_release_settings'),
+            {'level_id': self.level.id, 'current_lesson_id': self.lessons[1].id},
+            format='json',
+        )
+        self.assertEqual(update_response.status_code, 200, update_response.data)
+
+        self.client.force_authenticate(self.student)
+        lessons_response = self.client.get(reverse('lesson_list'))
+        self.assertEqual(
+            [lesson['is_locked'] for lesson in lessons_response.data],
+            [False, False, True],
+        )
+
+    def test_student_cannot_change_release_setting(self):
+        self.client.force_authenticate(self.student)
+        response = self.client.patch(
+            reverse('lesson_release_settings'),
+            {'level_id': self.level.id, 'current_lesson_id': self.lessons[1].id},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_lesson_from_another_level_is_rejected(self):
+        self.client.force_authenticate(self.admin)
+        response = self.client.patch(
+            reverse('lesson_release_settings'),
+            {'level_id': self.level.id, 'current_lesson_id': self.other_lesson.id},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 400)
+
+
 class MultiLevelLessonOrderTests(APITestCase):
     def setUp(self):
         self.a1 = Level.objects.create(slug='a1', order=1)
@@ -85,6 +167,10 @@ class MultiLevelLessonOrderTests(APITestCase):
             a2_lesson.levels.add(self.a2)
             self.a1_lessons.append(a1_lesson)
             self.a2_lessons.append(a2_lesson)
+        self.a1.current_lesson = self.a1_lessons[-1]
+        self.a2.current_lesson = self.a2_lessons[-1]
+        self.a1.save(update_fields=['current_lesson'])
+        self.a2.save(update_fields=['current_lesson'])
 
     def test_lessons_are_ordered_by_level_before_unit_number(self):
         student = User.objects.create_user('multi-level')
