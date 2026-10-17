@@ -1,13 +1,18 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import api from '../api';
-import { ArrowLeft, Send, Trash2, Loader2, CheckCircle, XCircle, ArrowRight, Home } from 'lucide-react';
+import api, { getApiErrorMessage } from '../api';
+import {
+  ArrowLeft, Send, Trash2, Loader2, CheckCircle, XCircle, ArrowRight,
+  Home, ChevronLeft, ChevronRight, LockKeyhole,
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useGame } from '../context/GameContext';
 import ExerciseBlock from '../components/exercises/ExerciseBlock';
 import VocabStudy from '../components/vocab/VocabStudy';
 import ExampleBadge from '../components/exercises/ExampleBadge';
 import { formatLessonTitle, formatLessonDescription } from '../utils/lessonDisplay';
+import { MediaProtectionProvider, ProtectedMedia } from '../context/MediaProtectionContext';
+import { useLanguage } from '../context/LanguageContext';
 
 function getYoutubeId(url) {
   const match = url?.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/))([^&?/\s]{11})/);
@@ -63,7 +68,7 @@ function SectionTitle({ emoji, title, sub }) {
   );
 }
 
-function QuizResultBanner({ result, onNext, onDashboard }) {
+function QuizResultBanner({ result, onNext, onDashboard, t }) {
   const great = result.score >= 80;
   const ok    = result.score >= 60 || result.completed;
   const completed = result.completed ?? ok;
@@ -82,7 +87,7 @@ function QuizResultBanner({ result, onNext, onDashboard }) {
       <p className={`text-sm mt-2 font-medium ${great ? 'text-emerald-500' : ok ? 'text-amber-500' : 'text-red-500'}`}>
         {great ? '🎉 Ajoyib! Dars muvaffaqiyatli yakunlandi!' :
          ok    ? '👍 Yaxshi natija! Dars yakunlandi.' :
-                 '😅 Qayta urinib ko\'ring — siz uddalaysiz!'}
+                 'Keyingi darsni ochish uchun kamida 60% oling va qayta urinib ko‘ring.'}
       </p>
       {completed && (
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-5">
@@ -91,22 +96,71 @@ function QuizResultBanner({ result, onNext, onDashboard }) {
               onClick={onNext}
               className="admin-btn-primary px-6 py-3"
             >
-              Keyingi dars
+              {t('Keyingi dars')}
               <ArrowRight size={16} />
             </button>
           ) : (
-            <p className="text-sm text-emerald-500 font-semibold">Barcha darslar yakunlandi! 🎓</p>
+            <p className="text-sm text-emerald-500 font-semibold">{t('Barcha darslar yakunlandi! 🎓')}</p>
           )}
           <button
             onClick={onDashboard}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-border stu-muted hover:stu-body text-sm font-semibold transition"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-border stu-muted hover:text-[color:var(--text-secondary)] text-sm font-semibold transition"
           >
             <Home size={16} />
-            Bosh sahifa
+            {t('Bosh sahifa')}
           </button>
         </div>
       )}
     </div>
+  );
+}
+
+function LessonPager({ previous, next, onNavigate, t, className = '' }) {
+  if (!previous && !next) return null;
+
+  return (
+    <nav className={`grid gap-3 sm:grid-cols-2 ${className}`} aria-label="Darslar bo‘yicha navigatsiya">
+      {previous ? (
+        <button
+          type="button"
+          onClick={() => onNavigate(previous.id)}
+          className="group flex min-w-0 items-center gap-3 rounded-2xl border border-border bg-surface-100 p-4 text-left shadow-card transition hover:-translate-y-0.5 hover:border-indigo-500/35 hover:shadow-card-hover"
+        >
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-surface-200 text-indigo-600 transition group-hover:bg-indigo-500 group-hover:text-white dark:text-indigo-300">
+            <ChevronLeft size={20} />
+          </span>
+          <span className="min-w-0">
+            <span className="block text-[10px] font-black uppercase tracking-[.14em] stu-muted">{t('Oldingi dars')}</span>
+            <span className="mt-1 block truncate text-sm font-bold stu-title">{formatLessonTitle(previous.title)}</span>
+          </span>
+        </button>
+      ) : <span className="hidden sm:block" />}
+
+      {next ? (
+        <button
+          type="button"
+          onClick={() => !next.is_locked && onNavigate(next.id)}
+          disabled={next.is_locked}
+          title={next.is_locked ? (next.locked_reason || 'Oldingi dars testidan kamida 60% olish kerak') : undefined}
+          className={`group flex min-w-0 items-center gap-3 rounded-2xl border p-4 text-left shadow-card transition sm:justify-end sm:text-right ${
+            next.is_locked
+              ? 'cursor-not-allowed border-border bg-surface-200/70 opacity-70'
+              : 'border-indigo-500/25 bg-gradient-to-br from-indigo-500/10 to-violet-500/10 hover:-translate-y-0.5 hover:border-indigo-500/45 hover:shadow-card-hover'
+          }`}
+        >
+          <span className="min-w-0 flex-1">
+            <span className="block text-[10px] font-black uppercase tracking-[.14em] stu-muted">
+              {next.is_locked ? t('Hali qulflangan') : t('Keyingi dars')}
+            </span>
+            <span className="mt-1 block truncate text-sm font-bold stu-title">{formatLessonTitle(next.title)}</span>
+            {next.is_locked && <span className="mt-1 block text-[11px] stu-muted">{t('Testdan kamida 60% oling')}</span>}
+          </span>
+          <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${next.is_locked ? 'bg-surface-300 stu-muted' : 'bg-indigo-600 text-white transition group-hover:translate-x-0.5'}`}>
+            {next.is_locked ? <LockKeyhole size={17} /> : <ChevronRight size={20} />}
+          </span>
+        </button>
+      ) : null}
+    </nav>
   );
 }
 
@@ -115,6 +169,7 @@ export default function LessonPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { refreshProgress } = useGame() || {};
+  const { language, t } = useLanguage();
 
   const [lesson, setLesson]       = useState(null);
   const [vocab, setVocab]         = useState([]);
@@ -127,7 +182,9 @@ export default function LessonPage() {
   const [comment, setComment]     = useState('');
   const [loading, setLoading]     = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [quizError, setQuizError] = useState('');
   const [answerAnim, setAnswerAnim] = useState({});
+  const [neighbors, setNeighbors] = useState({ previous: null, next: null });
   const quizRef = useRef(null);
 
   // Dars o'zgarganda holatni tozalash
@@ -136,7 +193,9 @@ export default function LessonPage() {
     setSubmitted(false);
     setAnswers({});
     setAnswerAnim({});
+    setQuizError('');
     setLoading(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [id]);
 
   useEffect(() => {
@@ -146,7 +205,8 @@ export default function LessonPage() {
       api.get(`/quiz/?lesson=${id}`),
       api.get(`/quiz/exercises/?lesson=${id}`),
       api.get(`/comments/?lesson=${id}`),
-    ]).then(([l, v, q, ex, c]) => {
+      api.get('/courses/lessons/'),
+    ]).then(([l, v, q, ex, c, lessonList]) => {
       if (l.data.is_locked) {
         navigate('/dashboard', { replace: true });
         return;
@@ -157,6 +217,14 @@ export default function LessonPage() {
       setQuizzes(quizList);
       setExercises(ex.data);
       setComments(c.data);
+      const orderedLessons = lessonList.data || [];
+      const currentIndex = orderedLessons.findIndex((item) => item.id === Number(id));
+      setNeighbors({
+        previous: currentIndex > 0 ? orderedLessons[currentIndex - 1] : null,
+        next: currentIndex >= 0 && currentIndex < orderedLessons.length - 1
+          ? orderedLessons[currentIndex + 1]
+          : null,
+      });
 
       // Namuna savolni oldindan to'ldirish
       const initial = {};
@@ -171,7 +239,7 @@ export default function LessonPage() {
     }).catch(() => {
       navigate('/dashboard', { replace: true });
     }).finally(() => setLoading(false));
-  }, [id, navigate]);
+  }, [id, navigate, language]);
 
   const scorableQuizzes = useMemo(
     () => quizzes.filter((q) => !q.is_example),
@@ -193,6 +261,7 @@ export default function LessonPage() {
       return;
     }
     setSubmitting(true);
+    setQuizError('');
     const payload = {
       lesson_id: Number(id),
       answers: quizzes.map((q) => ({
@@ -213,7 +282,20 @@ export default function LessonPage() {
       setSubmitted(true);
       if (data.completed) {
         refreshProgress?.();
+        if (data.next_lesson_id) {
+          setNeighbors((current) => ({
+            ...current,
+            next: current.next
+              ? { ...current.next, is_locked: false, locked_reason: null }
+              : { id: data.next_lesson_id, title: data.next_lesson_title, is_locked: false },
+          }));
+        }
       }
+    } catch (submitError) {
+      setQuizError(getApiErrorMessage(
+        submitError,
+        t('Test javoblarini yuborib bo‘lmadi. Qayta urinib ko‘ring.'),
+      ));
     } finally {
       setSubmitting(false);
     }
@@ -239,7 +321,7 @@ export default function LessonPage() {
       </div>
     );
   }
-  if (!lesson) return <div className="text-center py-20 text-slate-500">Dars topilmadi</div>;
+  if (!lesson) return <div className="py-20 text-center stu-muted">{t('Dars topilmadi')}</div>;
 
   const ytId = getYoutubeId(lesson.video_url);
   const displayTitle = formatLessonTitle(lesson.title);
@@ -248,48 +330,71 @@ export default function LessonPage() {
   const practiceExercises = exercises.filter((exercise) => exercise.type !== 'reading');
 
   return (
+    <MediaProtectionProvider identity={`${user?.username || 'student'} · ${user?.id || ''}`}>
     <div className="max-w-4xl mx-auto px-4 py-8">
 
       <button
         onClick={() => navigate('/dashboard')}
-        className="flex items-center gap-2 text-slate-500 hover:text-indigo-400 transition mb-6 font-medium"
+        className="mb-5 flex items-center gap-2 font-semibold stu-muted transition hover:text-indigo-500"
       >
-        <ArrowLeft size={18} /> Orqaga
+        <ArrowLeft size={18} /> {t('Darslarimga qaytish')}
       </button>
 
       <div className="mb-6">
         <h1 className="text-3xl font-extrabold stu-title leading-tight">{displayTitle}</h1>
       </div>
 
+      <LessonPager
+        previous={neighbors.previous}
+        next={neighbors.next}
+        onNavigate={(lessonId) => navigate(`/lessons/${lessonId}`)}
+        t={t}
+        className="mb-8"
+      />
+
       <section className="mb-8">
-        <SectionTitle emoji="🎬" title="Video dars" />
-        <div className="rounded-2xl overflow-hidden shadow-xl aspect-video bg-black border border-border">
+        <SectionTitle emoji="🎬" title={t('Video dars')} />
+        <ProtectedMedia className="rounded-2xl shadow-xl aspect-video bg-black border border-border">
           {ytId ? (
             <iframe
               className="w-full h-full"
               src={`https://www.youtube.com/embed/${ytId}`}
               title={displayTitle}
-              allowFullScreen
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allow="autoplay; encrypted-media"
+              referrerPolicy="strict-origin"
+            />
+          ) : lesson.video_url ? (
+            <video
+              className="w-full h-full"
+              src={lesson.video_url}
+              controls
+              controlsList="nodownload noremoteplayback"
+              disablePictureInPicture
+              disableRemotePlayback
+              onContextMenu={(event) => event.preventDefault()}
             />
           ) : (
-            <video className="w-full h-full" src={lesson.video_url} controls />
+            <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-surface-200 p-6 text-center">
+              <span className="text-4xl" aria-hidden="true">🎬</span>
+              <p className="font-bold stu-title">{t('Video mavjud emas')}</p>
+              <p className="text-sm stu-muted">{t('Bu til uchun video hali yuklanmagan.')}</p>
+            </div>
           )}
-        </div>
+        </ProtectedMedia>
       </section>
 
       {displayDesc && (
         <section className="mb-8">
-          <SectionTitle emoji="📖" title="Dars haqida" />
+          <SectionTitle emoji="📖" title={t('Dars haqida')} />
           <div className="student-panel">
-            <p className="text-slate-300 leading-relaxed text-base">{displayDesc}</p>
+            <p className="text-base leading-relaxed stu-body">{displayDesc}</p>
           </div>
         </section>
       )}
 
       {vocab.length > 0 && (
         <section className="mb-8">
-          <SectionTitle emoji="💬" title="Yangi so'zlar" sub={`${vocab.length} ta so'z — 4 bosqichda o'rganing`} />
+          <SectionTitle emoji="💬" title={t("Yangi so'zlar")} sub={`${vocab.length} ${t('ta so‘z — 4 bosqichda o‘rganing')}`} />
           <div className="student-panel">
             <VocabStudy words={vocab} />
           </div>
@@ -298,7 +403,7 @@ export default function LessonPage() {
 
       {readingExercises.length > 0 && (
         <section className="mb-8">
-          <SectionTitle emoji="📚" title="Reading" sub={`${readingExercises.length} ta matn — avval sahifani o'qing, keyin topshiriqni bajaring`} />
+          <SectionTitle emoji="📚" title={t('Reading')} sub={`${readingExercises.length} ta matn`} />
           <div className="space-y-4">
             {readingExercises.map((exercise, index) => (
               <ExerciseBlock key={exercise.id} exercise={exercise} index={index} />
@@ -309,7 +414,7 @@ export default function LessonPage() {
 
       {practiceExercises.length > 0 && (
         <section className="mb-8">
-          <SectionTitle emoji="✏️" title="Mashqlar" sub={`${practiceExercises.length} ta mashq`} />
+          <SectionTitle emoji="✏️" title={t('Mashqlar')} sub={`${practiceExercises.length} ${t('ta mashq')}`} />
           <div className="space-y-3">
             {practiceExercises.map((ex, i) => (
               <ExerciseBlock key={ex.id} exercise={ex} index={i} />
@@ -320,19 +425,20 @@ export default function LessonPage() {
 
       {quizzes.length > 0 && (
         <section className="mb-8" ref={quizRef}>
-          <SectionTitle emoji="📝" title="Test" sub={`${quizzes.length} ta savol`} />
+          <SectionTitle emoji="📝" title={t('Test')} sub={`${quizzes.length} ${t('ta savol')}`} />
 
           {quizResult && (
             <QuizResultBanner
               result={quizResult}
               onNext={() => navigate(`/lessons/${quizResult.next_lesson_id}`)}
               onDashboard={() => navigate('/dashboard')}
+              t={t}
             />
           )}
 
           {quizzes.some((q) => q.is_example) && !submitted && (
             <p className="text-xs stu-muted mb-4 italic">
-              1-savol namuna — shunday yechiladi. Siz 2-savoldan boshlang.
+              {t('1-savol namuna — shunday yechiladi. Siz 2-savoldan boshlang.')}
             </p>
           )}
 
@@ -399,29 +505,36 @@ export default function LessonPage() {
           </div>
 
           {!submitted && (
-            <button
-              onClick={handleSubmitQuiz}
-              disabled={submitting || !allScorableAnswered}
-              className="mt-6 w-full sm:w-auto admin-btn-primary px-8 py-3.5 disabled:opacity-50"
-            >
-              {submitting
-                ? <><Loader2 className="animate-spin" size={18} /> Tekshirilmoqda...</>
-                : <>📨 Testni yakunlash ({scorableQuizzes.filter((q) => answers[q.id] !== undefined).length}/{scorableQuizzes.length})</>
-              }
-            </button>
+            <div className="mt-6">
+              {quizError && (
+                <p className="mb-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm font-medium text-red-500">
+                  {quizError}
+                </p>
+              )}
+              <button
+                onClick={handleSubmitQuiz}
+                disabled={submitting || !allScorableAnswered}
+                className="w-full sm:w-auto admin-btn-primary px-8 py-3.5 disabled:opacity-50"
+              >
+                {submitting
+                  ? <><Loader2 className="animate-spin" size={18} /> {t('Tekshirilmoqda...')}</>
+                  : <>📨 {t('Testni yakunlash')} ({scorableQuizzes.filter((q) => answers[q.id] !== undefined).length}/{scorableQuizzes.length})</>
+                }
+              </button>
+            </div>
           )}
         </section>
       )}
 
       <section>
-        <SectionTitle emoji="💭" title="Izohlar" sub={`${comments.length} ta izoh`} />
+        <SectionTitle emoji="💭" title={t('Izohlar')} sub={`${comments.length} ${t('ta izoh')}`} />
 
         <form onSubmit={handleComment} className="flex gap-3 mb-6">
           <input
             type="text"
             value={comment}
             onChange={(e) => setComment(e.target.value)}
-            placeholder="Savol yoki izoh yozing..."
+            placeholder={t('Savol yoki izoh yozing...')}
             className="student-input"
           />
           <button
@@ -430,14 +543,14 @@ export default function LessonPage() {
             className="admin-btn-primary disabled:opacity-40"
           >
             <Send size={16} />
-            <span className="hidden sm:inline">Yuborish</span>
+            <span className="hidden sm:inline">{t('Yuborish')}</span>
           </button>
         </form>
 
         {comments.length === 0 ? (
           <div className="text-center py-10 student-panel border-dashed">
             <div className="text-4xl mb-2">💬</div>
-            <p className="text-slate-500 text-sm">Hali izoh yo'q — birinchi bo'ling!</p>
+            <p className="text-sm stu-muted">{t("Hali izoh yo'q — birinchi bo'ling!")}</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -448,25 +561,34 @@ export default function LessonPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-semibold text-slate-200">
+                    <p className="text-sm font-semibold stu-title">
                       {c.user_name || `@${c.user_username}`}
                     </p>
                     <div className="flex items-center gap-2 shrink-0">
-                      <p className="text-xs text-slate-500">{new Date(c.created_at).toLocaleString('uz-UZ')}</p>
+                      <p className="text-xs stu-muted">{new Date(c.created_at).toLocaleString('uz-UZ')}</p>
                       {(user?.role === 'admin' || user?.id === c.user) && (
-                        <button onClick={() => deleteComment(c.id)} className="text-slate-600 hover:text-red-400 transition">
+                        <button onClick={() => deleteComment(c.id)} className="stu-muted hover:text-red-500 transition">
                           <Trash2 size={14} />
                         </button>
                       )}
                     </div>
                   </div>
-                  <p className="text-slate-400 mt-1 text-sm leading-relaxed">{c.message}</p>
+                  <p className="mt-1 text-sm leading-relaxed stu-body">{c.message}</p>
                 </div>
               </div>
             ))}
           </div>
         )}
       </section>
+
+      <LessonPager
+        previous={neighbors.previous}
+        next={neighbors.next}
+        onNavigate={(lessonId) => navigate(`/lessons/${lessonId}`)}
+        t={t}
+        className="mt-8 border-t border-border pt-6"
+      />
     </div>
+    </MediaProtectionProvider>
   );
 }

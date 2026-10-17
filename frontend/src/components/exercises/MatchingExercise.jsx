@@ -14,19 +14,25 @@ function normalizeMatching(content) {
 }
 
 const PAIR_COLORS = [
-  'border-blue-400 bg-blue-50 text-blue-700',
-  'border-purple-400 bg-purple-50 text-purple-700',
-  'border-amber-400 bg-amber-50 text-amber-700',
-  'border-emerald-400 bg-emerald-50 text-emerald-700',
-  'border-rose-400 bg-rose-50 text-rose-700',
-  'border-indigo-400 bg-indigo-50 text-indigo-700',
-  'border-orange-400 bg-orange-50 text-orange-700',
-  'border-cyan-400 bg-cyan-50 text-cyan-700',
+  'border-blue-400 bg-blue-500/10 text-blue-700 dark:text-blue-300',
+  'border-purple-400 bg-purple-500/10 text-purple-700 dark:text-purple-300',
+  'border-amber-400 bg-amber-500/10 text-amber-700 dark:text-amber-300',
+  'border-emerald-400 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+  'border-rose-400 bg-rose-500/10 text-rose-700 dark:text-rose-300',
+  'border-indigo-400 bg-indigo-500/10 text-indigo-700 dark:text-indigo-300',
+  'border-orange-400 bg-orange-500/10 text-orange-700 dark:text-orange-300',
+  'border-cyan-400 bg-cyan-500/10 text-cyan-700 dark:text-cyan-300',
 ];
 
 export default function MatchingExercise({ exercise, onComplete }) {
   const { left, right, pairs } = normalizeMatching(exercise.content);
-  const hasExample = left.length >= 2 && pairs.length >= 1;
+  const configuredExampleCount = Number.isInteger(exercise.content?.example_count)
+    ? exercise.content.example_count
+    : (left.length >= 2 && pairs.length >= 1 ? 1 : 0);
+  const hasExample = configuredExampleCount > 0;
+  // Some book exercises map several words to the same category (for example,
+  // countable/uncountable). In those tasks a right-side option is reusable.
+  const allowsRepeatedRight = new Set(pairs).size < pairs.length;
 
   const exampleMatches = hasExample ? { 0: pairs[0] } : {};
 
@@ -46,7 +52,7 @@ export default function MatchingExercise({ exercise, onComplete }) {
   const handleClick = (side, idx) => {
     if (checked) return;
     if (hasExample && side === 'left' && idx === 0) return;
-    if (hasExample && side === 'right') {
+    if (hasExample && !allowsRepeatedRight && side === 'right') {
       const orig = shuffledRight[idx].origIdx;
       if (orig === pairs[0] || matches[0] === orig) return;
     }
@@ -73,9 +79,11 @@ export default function MatchingExercise({ exercise, onComplete }) {
     const newMatches = { ...matches };
     if (hasExample) newMatches[0] = pairs[0];
     delete newMatches[leftIdx];
-    Object.keys(newMatches).forEach((k) => {
-      if (Number(k) !== 0 && newMatches[k] === rightOrigIdx) delete newMatches[k];
-    });
+    if (!allowsRepeatedRight) {
+      Object.keys(newMatches).forEach((k) => {
+        if (Number(k) !== 0 && newMatches[k] === rightOrigIdx) delete newMatches[k];
+      });
+    }
     newMatches[leftIdx] = rightOrigIdx;
     if (hasExample) newMatches[0] = pairs[0];
 
@@ -83,16 +91,14 @@ export default function MatchingExercise({ exercise, onComplete }) {
     setSelected(null);
   };
 
-  const scorableIdxs = hasExample
-    ? left.map((_, i) => i).filter((i) => i > 0)
-    : left.map((_, i) => i);
+  const scorableIdxs = left.map((_, i) => i).filter((i) => i >= configuredExampleCount);
 
   const allMatched = scorableIdxs.length > 0 && scorableIdxs.every((i) => matches[i] !== undefined);
 
   const handleCheck = () => {
     setChecked(true);
     const correct = scorableIdxs.filter((i) => matches[i] === pairs[i]).length;
-    if (onComplete) onComplete(correct, scorableIdxs.length);
+    if (onComplete) onComplete(correct, scorableIdxs.length, { matches });
   };
 
   const handleRetry = () => {
@@ -113,9 +119,9 @@ export default function MatchingExercise({ exercise, onComplete }) {
         </p>
       )}
 
-      <div className="grid grid-cols-2 gap-8 mb-8 relative">
+      <div className="relative mb-8 grid grid-cols-2 gap-3 sm:gap-8">
         <div className="space-y-3">
-          <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-1">Savollar</div>
+          <div className="mb-2 ml-1 text-[10px] font-black uppercase tracking-widest stu-muted">Savollar</div>
           {left.map((text, i) => {
             const isExample = hasExample && i === 0;
             const isActive = selected?.side === 'left' && selected.idx === i;
@@ -125,10 +131,10 @@ export default function MatchingExercise({ exercise, onComplete }) {
             let statusClass = 'bg-surface-100 border-border stu-body hover:border-indigo-400 hover:shadow-md';
             if (checked || isExample) {
               statusClass = rightOrigIdx === pairs[i]
-                ? 'bg-emerald-50 border-emerald-500 text-emerald-700'
-                : 'bg-rose-50 border-rose-500 text-rose-700';
+                ? 'bg-emerald-500/10 border-emerald-500 text-emerald-700 dark:text-emerald-300'
+                : 'bg-rose-500/10 border-rose-500 text-rose-700 dark:text-rose-300';
             } else if (isActive) {
-              statusClass = 'bg-indigo-600 border-indigo-600 text-white shadow-lg ring-2 ring-indigo-100 scale-105 z-10';
+              statusClass = 'bg-indigo-600 border-indigo-600 text-white shadow-lg ring-2 ring-indigo-500/20 scale-105 z-10';
             } else if (isMatched) {
               statusClass = PAIR_COLORS[i % PAIR_COLORS.length] + ' shadow-sm opacity-90';
             }
@@ -142,7 +148,7 @@ export default function MatchingExercise({ exercise, onComplete }) {
                 className={`w-full text-left p-4 rounded-2xl border-2 text-sm font-semibold transition-all duration-300 relative group transform active:scale-95 ${statusClass}`}
               >
                 <div className="flex items-center gap-3">
-                  <span className={`flex items-center justify-center w-5 h-5 rounded-full text-[9px] font-bold ${isActive ? 'bg-indigo-400/30' : 'bg-surface-200 text-slate-400'}`}>
+                  <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[9px] font-bold ${isActive ? 'bg-indigo-400/30' : 'bg-surface-200 stu-muted'}`}>
                     {i + 1}
                   </span>
                   {isExample && <ExampleBadge />}
@@ -162,9 +168,9 @@ export default function MatchingExercise({ exercise, onComplete }) {
         </div>
 
         <div className="space-y-3">
-          <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 ml-1 text-right">Javoblar</div>
+          <div className="mb-2 ml-1 text-right text-[10px] font-black uppercase tracking-widest stu-muted">Javoblar</div>
           {shuffledRight.map((item, shIdx) => {
-            const isExampleRight = hasExample && item.origIdx === pairs[0];
+            const isExampleRight = hasExample && !allowsRepeatedRight && item.origIdx === pairs[0];
             const isActive = selected?.side === 'right' && selected.idx === shIdx;
             const leftIdxMatch = Object.keys(matches).find((k) => matches[k] === item.origIdx);
             const isMatched = leftIdxMatch !== undefined;
@@ -173,10 +179,10 @@ export default function MatchingExercise({ exercise, onComplete }) {
             if (checked || isExampleRight) {
               const isCorrect = leftIdxMatch !== undefined && matches[leftIdxMatch] === pairs[Number(leftIdxMatch)];
               statusClass = isCorrect
-                ? 'bg-emerald-50 border-emerald-500 text-emerald-700'
-                : 'bg-rose-50 border-rose-500 text-rose-700';
+                ? 'bg-emerald-500/10 border-emerald-500 text-emerald-700 dark:text-emerald-300'
+                : 'bg-rose-500/10 border-rose-500 text-rose-700 dark:text-rose-300';
             } else if (isActive) {
-              statusClass = 'bg-indigo-600 border-indigo-600 text-white shadow-lg ring-2 ring-indigo-100 scale-105 z-10';
+              statusClass = 'bg-indigo-600 border-indigo-600 text-white shadow-lg ring-2 ring-indigo-500/20 scale-105 z-10';
             } else if (isMatched) {
               statusClass = PAIR_COLORS[Number(leftIdxMatch) % PAIR_COLORS.length] + ' shadow-sm opacity-90';
             }
@@ -208,7 +214,7 @@ export default function MatchingExercise({ exercise, onComplete }) {
         {!checked ? (
           <div className="flex flex-col items-center gap-4">
             {selected && (
-              <div className="flex items-center gap-2 px-4 py-1.5 bg-indigo-50 text-indigo-600 rounded-full text-xs font-bold animate-bounce">
+              <div className="flex animate-bounce items-center gap-2 rounded-full bg-indigo-500/10 px-4 py-1.5 text-xs font-bold text-indigo-600 dark:text-indigo-300">
                 <Sparkles size={12} />
                 Endi ikkinchi tomondan mosini tanlang
               </div>
@@ -229,7 +235,7 @@ export default function MatchingExercise({ exercise, onComplete }) {
               </div>
               <div className="h-10 w-px bg-border" />
               <div className="flex flex-col">
-                <span className="text-xs font-black text-slate-400 uppercase tracking-widest">Natija</span>
+                <span className="text-xs font-black uppercase tracking-widest stu-muted">Natija</span>
                 <span className="text-sm font-bold stu-muted italic">
                   {score === scorableIdxs.length ? 'Mukammal!' : 'Yaxshi urinish!'}
                 </span>

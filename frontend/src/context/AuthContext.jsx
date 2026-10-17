@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import api from '../api';
+import { clearTokens, getAccessToken, setTokens } from '../authStorage';
 
 const AuthContext = createContext(null);
 
@@ -8,12 +9,12 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('access_token');
+    const token = getAccessToken();
     if (token) {
       api.get('/auth/me/')
         .then(({ data }) => setUser(data))
         .catch(() => {
-          localStorage.clear();
+          clearTokens();
           setUser(null);
         })
         .finally(() => setLoading(false));
@@ -24,19 +25,24 @@ export function AuthProvider({ children }) {
 
   const login = async (username, password) => {
     const { data } = await api.post('/auth/login/', { username, password });
-    localStorage.setItem('access_token', data.tokens.access);
-    localStorage.setItem('refresh_token', data.tokens.refresh);
+    setTokens(data.tokens);
     setUser(data.user);
     return data.user;
   };
 
   const logout = () => {
-    localStorage.clear();
+    clearTokens();
     setUser(null);
   };
 
+  const updateProfile = async (changes) => {
+    const { data } = await api.put('/auth/me/', changes);
+    setUser(data);
+    return data;
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,10 +1,15 @@
-import { useState, useEffect } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import {
+  BookOpen, LayoutDashboard, BookMarked, BarChart2, Trophy,
+  LogOut, Sun, Moon, Zap, ChevronDown, UserRound,
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useGame } from '../context/GameContext';
 import api from '../api';
-import { BookOpen, LayoutDashboard, BookMarked, BarChart2, Trophy, LogOut, Sun, Moon, Zap } from 'lucide-react';
+import LanguageSwitcher from './LanguageSwitcher';
+import { useLanguage } from '../context/LanguageContext';
 
 const AVATAR_COLORS = [
   'from-violet-500 to-purple-600',
@@ -17,37 +22,36 @@ const AVATAR_COLORS = [
 
 const NAV_ITEMS = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Bosh sahifa', exact: true },
-  { to: '/my-lessons', icon: BookMarked, label: 'Darslarim' },
+  { to: '/my-lessons', icon: BookMarked, label: 'Darslarim', lessonRoute: true },
   { to: '/results', icon: BarChart2, label: 'Natijalar' },
   { to: '/leaderboard', icon: Trophy, label: 'Reyting' },
 ];
 
 function getAvatarColor(username = '') {
   let sum = 0;
-  for (let i = 0; i < username.length; i++) sum += username.charCodeAt(i);
+  for (let i = 0; i < username.length; i += 1) sum += username.charCodeAt(i);
   return AVATAR_COLORS[sum % AVATAR_COLORS.length];
 }
 
-function ProgressRing({ percent, size = 36, stroke = 2.5 }) {
-  const r = (size - stroke * 2) / 2;
-  const circ = 2 * Math.PI * r;
-  const offset = circ - (percent / 100) * circ;
+function ProgressRing({ percent, size = 38, stroke = 2.5 }) {
+  const radius = (size - stroke * 2) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (percent / 100) * circumference;
   return (
-    <svg width={size} height={size} className="-rotate-90">
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--ring-track)" strokeWidth={stroke} />
+    <svg width={size} height={size} className="-rotate-90" aria-hidden="true">
+      <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="var(--ring-track)" strokeWidth={stroke} />
       <circle
-        cx={size / 2} cy={size / 2} r={r} fill="none"
-        stroke="url(#navRing)" strokeWidth={stroke}
-        strokeDasharray={circ} strokeDashoffset={offset}
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        fill="none"
+        stroke="#6366f1"
+        strokeWidth={stroke}
+        strokeDasharray={circumference}
+        strokeDashoffset={offset}
         strokeLinecap="round"
         style={{ transition: 'stroke-dashoffset 0.6s ease' }}
       />
-      <defs>
-        <linearGradient id="navRing" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="#6366f1" />
-          <stop offset="100%" stopColor="#06b6d4" />
-        </linearGradient>
-      </defs>
     </svg>
   );
 }
@@ -56,9 +60,12 @@ export default function Navbar() {
   const { user, logout } = useAuth();
   const { dark, toggle } = useTheme();
   const { xp } = useGame();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
+  const menuRef = useRef(null);
   const [progressPct, setProgressPct] = useState(0);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   useEffect(() => {
     if (user && user.role !== 'admin') {
@@ -68,95 +75,133 @@ export default function Navbar() {
         setProgressPct(total > 0 ? Math.round((done / total) * 100) : 0);
       }).catch(() => {});
     }
-  }, [user]);
+  }, [user, location.pathname]);
 
-  const handleLogout = () => { logout(); navigate('/login'); };
+  useEffect(() => {
+    setProfileOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const closeOnOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) setProfileOpen(false);
+    };
+    document.addEventListener('pointerdown', closeOnOutside);
+    return () => document.removeEventListener('pointerdown', closeOnOutside);
+  }, []);
 
   if (!user || user.role === 'admin') return null;
 
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
   const initials = (user.full_name || user.username || '?')
-    .split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+    .split(' ').map((word) => word[0]).slice(0, 2).join('').toUpperCase();
   const avatarGrad = getAvatarColor(user.username);
 
   return (
-    <nav className="student-nav">
-      <div className="max-w-6xl mx-auto px-4 h-14 flex items-center gap-4">
-
-        {/* Logo */}
-        <Link to="/dashboard" className="flex items-center gap-2.5 shrink-0">
-          <div className="bg-gradient-to-br from-indigo-500 to-violet-600 p-1.5 rounded-xl shadow-md shadow-indigo-500/25">
-            <BookOpen className="text-white" size={18} />
-          </div>
-          <span className="font-extrabold stu-title text-base hidden sm:block tracking-tight">Learn English</span>
+    <nav className="student-nav" aria-label={t('Bosh sahifa')}>
+      <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-3 sm:px-5">
+        <Link to="/dashboard" className="group flex shrink-0 items-center gap-2.5 rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
+          <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 shadow-md shadow-indigo-500/25 transition-transform group-hover:-rotate-3 group-hover:scale-105">
+            <BookOpen className="text-white" size={19} />
+          </span>
+          <span className="hidden sm:block">
+            <span className="block text-sm font-black leading-tight stu-title">Learn English</span>
+            <span className="block text-[10px] font-bold uppercase tracking-[.16em] text-indigo-500 dark:text-indigo-300">{t('O‘quv platformasi')}</span>
+          </span>
         </Link>
 
-        {/* Desktop nav — markazda */}
-        <div className="hidden md:flex flex-1 items-center justify-center">
-          <div className="flex items-center gap-0.5 bg-surface-200/60 rounded-2xl p-1 border border-border">
+        <div className="hidden min-w-0 flex-1 items-center justify-center md:flex">
+          <div className="flex items-center gap-1 rounded-2xl border border-border bg-surface-200/70 p-1.5 shadow-inner">
             {NAV_ITEMS.map((item) => {
               const Icon = item.icon;
               const active = item.exact
                 ? location.pathname === item.to
-                : location.pathname.startsWith(item.to);
+                : location.pathname.startsWith(item.to)
+                  || (item.lessonRoute && location.pathname.startsWith('/lessons/'));
               return (
                 <Link
                   key={item.to}
                   to={item.to}
-                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold transition-all ${
+                  aria-current={active ? 'page' : undefined}
+                  className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold transition-all lg:px-4 ${
                     active
-                      ? 'bg-surface-100 text-indigo-600 shadow-sm border border-border'
-                      : 'stu-muted hover:stu-body hover:bg-surface-100/60'
+                      ? 'bg-surface-100 text-indigo-600 shadow-card ring-1 ring-indigo-500/10 dark:text-indigo-300'
+                      : 'stu-muted hover:bg-surface-100/80 hover:text-[color:var(--text-primary)]'
                   }`}
                 >
-                  <Icon size={15} />
-                  <span className="hidden lg:inline">{item.label}</span>
+                  <Icon size={17} />
+                  <span>{t(item.label)}</span>
                 </Link>
               );
             })}
           </div>
         </div>
 
-        {/* O'ng panel */}
-        <div className="flex items-center gap-1.5 ml-auto shrink-0">
-          {/* XP */}
-          <div className="hidden sm:flex items-center gap-1 bg-violet-500/10 text-violet-600 dark:text-violet-300 px-2.5 py-1 rounded-full text-xs font-bold border border-violet-500/20">
-            <Zap size={12} />
-            {xp}
+        <div className="ml-auto flex shrink-0 items-center gap-1.5">
+          <LanguageSwitcher compact />
+          <div className="flex items-center gap-1.5 rounded-xl border border-violet-500/20 bg-violet-500/10 px-2.5 py-2 text-xs font-black text-violet-700 dark:text-violet-300" title="Tajriba ballari">
+            <Zap size={14} />
+            <span>{xp}</span>
+            <span className="hidden sm:inline">XP</span>
           </div>
 
-          {/* Theme toggle */}
           <button
+            type="button"
             onClick={toggle}
-            className="p-2 rounded-xl stu-muted hover:stu-body hover:bg-surface-200 transition"
-            title={dark ? 'Kunduzgi rejim' : 'Tungi rejim'}
+            className="grid h-10 w-10 place-items-center rounded-xl stu-muted transition hover:bg-surface-200 hover:text-[color:var(--text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+            title={dark ? t('Kunduzgi rejim') : t('Tungi rejim')}
+            aria-label={dark ? t('Kunduzgi rejim') : t('Tungi rejim')}
           >
-            {dark ? <Sun size={17} /> : <Moon size={17} />}
+            {dark ? <Sun size={18} /> : <Moon size={18} />}
           </button>
 
-          {/* Avatar + progress */}
-          <div className="relative flex items-center" title={`Progress: ${progressPct}%`}>
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <ProgressRing percent={progressPct} />
-            </div>
-            <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${avatarGrad} flex items-center justify-center text-white font-bold text-[10px] shadow-sm select-none`}>
-              {initials}
-            </div>
-          </div>
+          <div className="relative" ref={menuRef}>
+            <button
+              type="button"
+              onClick={() => setProfileOpen((open) => !open)}
+              className="flex h-11 items-center gap-2 rounded-2xl border border-transparent px-1.5 transition hover:border-border hover:bg-surface-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 sm:pr-2.5"
+              aria-expanded={profileOpen}
+              aria-haspopup="menu"
+            >
+              <span className="relative grid h-9 w-9 place-items-center">
+                <span className="absolute inset-0 grid place-items-center"><ProgressRing percent={progressPct} /></span>
+                <span className={`grid h-8 w-8 place-items-center rounded-full bg-gradient-to-br ${avatarGrad} text-[10px] font-black text-white shadow-sm`}>
+                  {initials}
+                </span>
+              </span>
+              <span className="hidden max-w-28 text-left lg:block">
+                <span className="block truncate text-sm font-bold leading-tight stu-title">{user.full_name || user.username}</span>
+                <span className="block text-[10px] font-semibold stu-muted">{progressPct}% {t('bajarildi')}</span>
+              </span>
+              <ChevronDown size={14} className={`hidden stu-muted transition-transform sm:block ${profileOpen ? 'rotate-180' : ''}`} />
+            </button>
 
-          <div className="text-right hidden lg:block min-w-0">
-            <p className="text-sm font-semibold stu-title leading-tight truncate max-w-[120px]">
-              {(user.full_name || user.username).split(' ')[0]}
-            </p>
-            <p className="text-[10px] stu-muted">{progressPct}% bajarildi</p>
+            {profileOpen && (
+              <div className="absolute right-0 top-[calc(100%+.6rem)] z-[80] w-64 overflow-hidden rounded-2xl border border-border bg-surface-100 p-2 shadow-2xl" role="menu">
+                <div className="mb-1 flex items-center gap-3 rounded-xl bg-surface-200/70 p-3">
+                  <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br ${avatarGrad} text-xs font-black text-white`}>
+                    {initials}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-bold stu-title">{user.full_name || user.username}</span>
+                    <span className="block truncate text-xs stu-muted">@{user.username}</span>
+                  </span>
+                </div>
+                <div className="flex items-center justify-between px-3 py-2 text-xs">
+                  <span className="flex items-center gap-1.5 font-bold text-violet-600 dark:text-violet-300"><Zap size={13} /> {xp} XP</span>
+                  <span className="font-semibold stu-muted">{t('Progress')} {progressPct}%</span>
+                </div>
+                <Link to="/results" role="menuitem" className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold stu-body hover:bg-surface-200">
+                  <UserRound size={16} /> {t('Natijalarim')}
+                </Link>
+                <button type="button" onClick={handleLogout} role="menuitem" className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold text-red-500 transition hover:bg-red-500/10">
+                  <LogOut size={16} /> {t('Chiqish')}
+                </button>
+              </div>
+            )}
           </div>
-
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-1.5 text-sm stu-muted hover:text-red-500 transition px-2.5 py-2 rounded-xl hover:bg-red-500/10"
-          >
-            <LogOut size={15} />
-            <span className="hidden xl:inline">Chiqish</span>
-          </button>
         </div>
       </div>
     </nav>

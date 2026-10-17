@@ -1,40 +1,42 @@
 import { Link, useLocation } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
 import { LayoutDashboard, BookMarked, BarChart2, Trophy } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
+
+const LINKS = [
+  { to: '/dashboard', icon: LayoutDashboard, label: 'Bosh', exact: true },
+  { to: '/my-lessons', icon: BookMarked, label: 'Darslar', lessonRoute: true },
+  { to: '/results', icon: BarChart2, label: 'Natijalar' },
+  { to: '/leaderboard', icon: Trophy, label: 'Reyting' },
+];
 
 export default function MobileNav() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const location = useLocation();
 
   if (!user || user.role === 'admin') return null;
 
-  const links = [
-    { to: '/dashboard',   icon: LayoutDashboard, label: 'Bosh'      },
-    { to: '/my-lessons',  icon: BookMarked,      label: 'Darslar'   },
-    { to: '/results',     icon: BarChart2,        label: 'Natijalar' },
-    { to: '/leaderboard', icon: Trophy,           label: 'Reyting'   },
-  ];
-
   return (
-    <nav className="student-mobile-nav fixed bottom-0 left-0 right-0 z-50 md:hidden">
-      <div className="flex items-stretch">
-        {links.map(({ to, icon: Icon, label }) => {
-          const isActive = location.pathname === to
-            || (to !== '/dashboard' && location.pathname.startsWith(to));
+    <nav className="student-mobile-nav fixed inset-x-0 bottom-0 z-50 md:hidden" aria-label="Mobil navigatsiya">
+      <div className="mx-auto grid max-w-lg grid-cols-4 px-1 pb-[max(.35rem,env(safe-area-inset-bottom))] pt-1">
+        {LINKS.map(({ to, icon: Icon, label, exact, lessonRoute }) => {
+          const active = exact
+            ? location.pathname === to
+            : location.pathname.startsWith(to)
+              || (lessonRoute && location.pathname.startsWith('/lessons/'));
           return (
             <Link
               key={to}
               to={to}
-              className={`flex-1 flex flex-col items-center justify-center py-2.5 gap-0.5 transition-all ${
-                isActive ? 'text-indigo-600' : 'stu-muted'
-              }`}
+              aria-current={active ? 'page' : undefined}
+              className={`relative flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 transition ${active ? 'text-indigo-600 dark:text-indigo-300' : 'stu-muted'}`}
             >
-              <div className={`rounded-xl p-1.5 transition ${isActive ? 'bg-indigo-500/15' : ''}`}>
-                <Icon size={20} />
-              </div>
-              <span className={`text-[10px] font-semibold ${isActive ? 'text-indigo-600' : 'stu-muted'}`}>
-                {label}
+              {active && <span className="absolute -top-1 h-1 w-7 rounded-b-full bg-indigo-500" />}
+              <span className={`grid h-8 w-10 place-items-center rounded-xl transition ${active ? 'bg-indigo-500/15' : ''}`}>
+                <Icon size={20} strokeWidth={active ? 2.5 : 2} />
               </span>
+              <span className="max-w-full truncate text-[10px] font-bold">{t(label)}</span>
             </Link>
           );
         })}

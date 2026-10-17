@@ -4,6 +4,7 @@ import ExampleBadge from './ExampleBadge';
 import FillBlankExercise from './FillBlankExercise';
 import MatchingExercise from './MatchingExercise';
 import BookPageViewer from './BookPageViewer';
+import { ProtectedMedia } from '../../context/MediaProtectionContext';
 
 /**
  * Listening exercise
@@ -18,12 +19,17 @@ export default function ListeningExercise({ exercise, onComplete }) {
     options: item.options || [],
     correct: item.correct_index ?? item.correct ?? 0,
   })) || [], [content]);
+  const rowAudioUrls = Array.isArray(content?.audio_urls) ? content.audio_urls : [];
+  const hasRowAudio = rowAudioUrls.some(Boolean);
   const hasSentenceContent = Array.isArray(content?.sentences) && content.sentences.length > 0 && questions.length === 0;
   const hasMatchingContent = Array.isArray(content?.left) && Array.isArray(content?.right) && questions.length === 0;
 
   const audioRef = useRef(null);
   const [playing, setPlaying] = useState(false);
-  const hasExample = questions.length >= 2;
+  const exampleCount = Number.isInteger(content?.example_count)
+    ? content.example_count
+    : (questions.length >= 2 ? 1 : 0);
+  const hasExample = exampleCount > 0;
   const exampleAnswers = useMemo(
     () => (hasExample ? { 0: questions[0].correct } : {}),
     [hasExample, questions]
@@ -60,19 +66,21 @@ export default function ListeningExercise({ exercise, onComplete }) {
 
   /* ── answers ── */
   const choose = (qi, idx) => {
-    if (submitted || (hasExample && qi === 0)) return;
+    if (submitted || qi < exampleCount) return;
     setAnswers((a) => ({ ...a, [qi]: idx }));
   };
 
-  const scorable = hasExample ? questions.slice(1) : questions;
+  const scorable = questions.slice(exampleCount);
 
   const handleSubmit = () => {
     if (scorable.length === 0) return;
-    const allDone = scorable.every((_, i) => answers[hasExample ? i + 1 : i] !== undefined);
+    const allDone = scorable.every((_, i) => answers[i + exampleCount] !== undefined);
     if (!allDone) return;
     setSubmitted(true);
-    const correct = scorable.filter((q, i) => answers[hasExample ? i + 1 : i] === q.correct).length;
-    onComplete?.(correct, scorable.length);
+    const correct = scorable.filter((q, i) => answers[i + exampleCount] === q.correct).length;
+    onComplete?.(correct, scorable.length, {
+      answers: Object.fromEntries(scorable.map((_, i) => [String(i), answers[i + exampleCount]])),
+    });
   };
 
   const reset = () => {
@@ -95,20 +103,20 @@ export default function ListeningExercise({ exercise, onComplete }) {
       )}
       {/* ── Topshiriq rasmlari ── */}
       {content?.image_url && (
-        <div className="relative group rounded-xl overflow-hidden border border-gray-200 shadow-sm max-h-96 flex justify-center bg-gray-50 cursor-zoom-in" onClick={() => setModalImage(content.image_url)}>
-          <img src={content.image_url} alt="Listening task" className="max-w-full max-h-96 object-contain transition group-hover:opacity-90" />
+        <ProtectedMedia className="group flex max-h-96 cursor-zoom-in justify-center rounded-xl border border-border bg-surface-200/50 shadow-sm" onClick={() => setModalImage(content.image_url)}>
+          <img src={content.image_url} alt="Listening task" draggable="false" className="max-w-full max-h-96 object-contain transition group-hover:opacity-90" />
           <div className="absolute top-4 right-4 p-2 bg-white/80 backdrop-blur-md rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
             <Maximize2 size={18} className="text-gray-700" />
           </div>
-        </div>
+        </ProtectedMedia>
       )}
       {content?.images?.map((img, idx) => (
-        <div key={idx} className="relative group rounded-xl overflow-hidden border border-gray-200 shadow-sm max-h-96 flex justify-center bg-gray-50 cursor-zoom-in" onClick={() => setModalImage(img)}>
-          <img src={img} alt={`Listening task ${idx + 1}`} className="max-w-full max-h-96 object-contain transition group-hover:opacity-90" />
+        <ProtectedMedia key={idx} className="group flex max-h-96 cursor-zoom-in justify-center rounded-xl border border-border bg-surface-200/50 shadow-sm" onClick={() => setModalImage(img)}>
+          <img src={img} alt={`Listening task ${idx + 1}`} draggable="false" className="max-w-full max-h-96 object-contain transition group-hover:opacity-90" />
           <div className="absolute top-4 right-4 p-2 bg-white/80 backdrop-blur-md rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
             <Maximize2 size={18} className="text-gray-700" />
           </div>
-        </div>
+        </ProtectedMedia>
       ))}
 
       {/* ── Image Modal (Professional Zoom & Pan) ── */}
@@ -151,7 +159,7 @@ export default function ListeningExercise({ exercise, onComplete }) {
           </div>
 
           {/* Image Container with Pan Logic */}
-          <div 
+          <ProtectedMedia
             className="w-full h-full flex items-center justify-center cursor-grab active:cursor-grabbing"
             onMouseDown={(e) => {
               e.stopPropagation();
@@ -177,14 +185,14 @@ export default function ListeningExercise({ exercise, onComplete }) {
                 transform: `translate(${position.x}px, ${position.y}px) scale(${zoom})`,
               }}
             />
-          </div>
+          </ProtectedMedia>
         </div>
       )}
 
       {/* ── Audio player ── */}
-      {audio_url && (
-        <div className="rounded-xl overflow-hidden bg-gradient-to-r from-teal-50 to-cyan-50 border border-teal-200 p-4">
-          <div className="flex items-center gap-2 mb-3 text-teal-700">
+      {audio_url && !hasRowAudio && (
+        <div className="overflow-hidden rounded-xl border border-teal-500/25 bg-gradient-to-r from-teal-500/10 to-cyan-500/10 p-4">
+          <div className="mb-3 flex items-center gap-2 text-teal-700 dark:text-teal-300">
             <Volume2 size={16} />
             <span className="text-sm font-semibold">Audio tinglang</span>
           </div>
@@ -200,7 +208,7 @@ export default function ListeningExercise({ exercise, onComplete }) {
               </button>
               <button
                 onClick={restart}
-                className="w-8 h-8 rounded-full bg-white border border-teal-200 text-teal-600 hover:bg-teal-50 flex items-center justify-center transition shrink-0"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-teal-500/25 bg-surface-100 text-teal-600 transition hover:bg-teal-500/10 dark:text-teal-300"
                 title="Qayta boshlash"
               >
                 <RotateCcw size={13} />
@@ -212,9 +220,12 @@ export default function ListeningExercise({ exercise, onComplete }) {
                   onEnded={handleAudioEnded}
                   className="w-full h-8"
                   controls
+                  controlsList="nodownload noremoteplayback"
+                  preload="metadata"
+                  disableRemotePlayback
                   style={{ display: 'none' }}
                 />
-                <p className="text-xs text-teal-600 truncate">{audio_url.split('/').pop()}</p>
+                <p className="truncate text-xs text-teal-700 dark:text-teal-300">{audio_url.split('/').pop()}</p>
               </div>
             </div>
           ) : ytEmbed ? (
@@ -223,22 +234,31 @@ export default function ListeningExercise({ exercise, onComplete }) {
               <iframe
                 src={ytEmbed}
                 title="Listening audio"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
+                allow="autoplay; encrypted-media"
+                referrerPolicy="strict-origin-when-cross-origin"
                 className="w-full h-full"
               />
             </div>
           ) : (
-            /* Fallback: clickable link */
-            <a
-              href={audio_url}
-              target="_blank"
-              rel="noreferrer"
-              className="text-sm text-teal-600 underline hover:text-teal-800"
-            >
-              Audio ochish
-            </a>
+            <p className="text-sm text-amber-600">Audio brauzerda ijro qilinmadi.</p>
           )}
+        </div>
+      )}
+
+      {hasRowAudio && questions.length === 0 && (
+        <div className="rounded-xl border border-teal-500/25 bg-teal-500/5 p-4">
+          <div className="mb-3 flex items-center gap-2 text-teal-700 dark:text-teal-300">
+            <Volume2 size={16} />
+            <span className="text-sm font-semibold">Audio parchalar</span>
+          </div>
+          <div className="space-y-2">
+            {rowAudioUrls.map((url, index) => url && (
+              <div key={`${url}-${index}`} className="flex items-center gap-3 rounded-lg border border-border bg-surface-100 px-3 py-2">
+                <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-teal-500/15 text-[10px] font-black text-teal-700 dark:text-teal-300">{index + 1}</span>
+                <audio src={url} controls controlsList="nodownload noremoteplayback" preload="metadata" disableRemotePlayback className="h-9 w-full" />
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -265,7 +285,7 @@ export default function ListeningExercise({ exercise, onComplete }) {
           )}
           <p className="text-xs font-semibold stu-muted uppercase tracking-wide">Savollar</p>
           {questions.map((q, qi) => {
-            const isExample = hasExample && qi === 0;
+            const isExample = qi < exampleCount;
             return (
               <div
                 key={qi}
@@ -278,16 +298,27 @@ export default function ListeningExercise({ exercise, onComplete }) {
                   {isExample && <ExampleBadge />}
                   {q.question}
                 </p>
+                {rowAudioUrls[qi] && (
+                  <audio
+                    src={rowAudioUrls[qi]}
+                    controls
+                    controlsList="nodownload noremoteplayback"
+                    preload="metadata"
+                    disableRemotePlayback
+                    className="mb-3 h-9 w-full"
+                    onContextMenu={(event) => event.preventDefault()}
+                  />
+                )}
                 <div className="space-y-1.5">
                   {q.options.map((opt, oi) => {
                     const chosen = answers[qi] === oi;
                     let cls = 'border-border bg-surface-50 stu-body hover:border-teal-400 hover:bg-teal-500/10';
                     if (submitted || isExample) {
-                      if (oi === q.correct) cls = 'border-green-400 bg-green-50 text-green-800 font-semibold';
-                      else if (chosen && !isExample) cls = 'border-red-300 bg-red-50 text-red-700 line-through';
+                      if (oi === q.correct) cls = 'border-green-500 bg-green-500/10 text-green-700 dark:text-green-300 font-semibold';
+                      else if (chosen && !isExample) cls = 'border-red-500 bg-red-500/10 text-red-700 dark:text-red-300 line-through';
                       else cls = 'border-border bg-surface-200 stu-muted';
                     } else if (chosen) {
-                      cls = 'border-teal-500 bg-teal-50 text-teal-800';
+                      cls = 'border-teal-500 bg-teal-500/10 text-teal-700 dark:text-teal-300';
                     }
                     return (
                       <button
@@ -308,7 +339,7 @@ export default function ListeningExercise({ exercise, onComplete }) {
           {!submitted ? (
             <button
               onClick={handleSubmit}
-              disabled={scorable.some((_, i) => answers[hasExample ? i + 1 : i] === undefined)}
+              disabled={scorable.some((_, i) => answers[i + exampleCount] === undefined)}
               className="w-full py-2.5 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white font-semibold rounded-xl transition text-sm"
             >
               Tekshirish
@@ -316,11 +347,11 @@ export default function ListeningExercise({ exercise, onComplete }) {
           ) : (
             <div className="flex items-center gap-3">
               <div className={`flex-1 text-center py-2 rounded-xl text-sm font-semibold ${
-                scorable.filter((q, i) => answers[hasExample ? i + 1 : i] === q.correct).length === scorable.length
-                  ? 'bg-green-100 text-green-700'
-                  : 'bg-orange-100 text-orange-700'
+                scorable.filter((q, i) => answers[i + exampleCount] === q.correct).length === scorable.length
+                  ? 'bg-green-500/10 text-green-700 dark:text-green-300'
+                  : 'bg-orange-500/10 text-orange-700 dark:text-orange-300'
               }`}>
-                {scorable.filter((q, i) => answers[hasExample ? i + 1 : i] === q.correct).length} / {scorable.length} to'g'ri
+                {scorable.filter((q, i) => answers[i + exampleCount] === q.correct).length} / {scorable.length} to'g'ri
               </div>
               <button
                 onClick={reset}

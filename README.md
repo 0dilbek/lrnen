@@ -1,5 +1,7 @@
 # English LMS — Learning Management System
 
+Production VPS deploy uchun tavsiya etilgan oddiy systemd yo‘riqnomasi: [README_SYSTEMD.md](README_SYSTEMD.md).
+
 A full-stack English language learning platform built with **Django REST Framework** and **React**. Supports CEFR levels (A1 → C2) plus IELTS, role-based access, video lessons, vocabulary, quizzes, exercises, progress tracking, and a gamified leaderboard.
 
 ---

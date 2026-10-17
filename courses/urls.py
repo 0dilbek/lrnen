@@ -11,4 +11,6 @@ urlpatterns = [
     path('vocabulary/<int:pk>/', views.VocabularyDetailView.as_view(), name='vocabulary_detail'),
     path('progress/', views.UserProgressView.as_view(), name='user_progress'),
     path('stats/', views.StatsView.as_view(), name='stats'),
+    path('media-assets/', views.MediaAssetListView.as_view(), name='media_assets'),
+    path('media-assets/<int:pk>/', views.MediaAssetDetailView.as_view(), name='media_asset_detail'),
 ]

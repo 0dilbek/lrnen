@@ -23,10 +23,15 @@ class UserManager(BaseUserManager):
 
 class User(AbstractBaseUser, PermissionsMixin):
     ROLE_CHOICES = [('admin', 'Admin'), ('student', 'Student')]
+    LANGUAGE_CHOICES = [
+        ('kaa', 'Qoraqalpoqcha'),
+        ('uz', "O'zbekcha"),
+    ]
 
     username = models.CharField(max_length=50, unique=True)
     full_name = models.CharField(max_length=100, blank=True)
     role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='student')
+    language = models.CharField(max_length=3, choices=LANGUAGE_CHOICES, default='kaa')
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)

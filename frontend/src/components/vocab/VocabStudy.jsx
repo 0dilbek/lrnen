@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, RotateCcw, CheckCircle, XCircle, ArrowRight, Volume2 } from 'lucide-react';
+import { useLanguage } from '../../context/LanguageContext';
 
 const STAGE_INFO = [
   { label: '1. Tanishish', emoji: '👀', color: 'from-violet-500 to-purple-600' },
@@ -24,6 +25,8 @@ function stableShuffle(values, seed) {
 
 export default function VocabStudy({ words }) {
   const [stage, setStage] = useState(0);
+  const { language, t } = useLanguage();
+  const languageCode = language === 'kaa' ? 'KAA' : 'UZ';
 
   if (!words || words.length === 0) return null;
 
@@ -39,11 +42,11 @@ export default function VocabStudy({ words }) {
                 ? `bg-gradient-to-r ${s.color} text-white shadow-sm scale-105`
                 : stage > i
                 ? 'bg-emerald-500/15 text-emerald-400'
-                : 'bg-surface-200 text-slate-500'
+                : 'bg-surface-200 stu-muted'
             }`}
           >
             {stage > i ? <CheckCircle size={12} /> : <span>{s.emoji}</span>}
-            {s.label}
+            {i === 1 ? `2. EN → ${languageCode}` : i === 2 ? `3. ${languageCode} → EN` : t(s.label)}
           </div>
         ))}
       </div>
@@ -85,7 +88,7 @@ function Flashcards({ words, onComplete }) {
 
   return (
     <div>
-      <p className="text-sm text-slate-500 mb-4 font-medium">
+      <p className="mb-4 text-sm font-medium stu-muted">
         {idx + 1} / {words.length} — kartani bosib, tarjimani ko'ring 👆
       </p>
 
@@ -127,13 +130,13 @@ function Flashcards({ words, onComplete }) {
               <p className={`text-lg font-semibold bg-gradient-to-r ${grad} bg-clip-text text-transparent`}>{word.word}</p>
               <button 
                 onClick={handleSpeak}
-                className="p-1 rounded-full text-slate-500 hover:text-indigo-400 transition-colors"
+                className="rounded-full p-1 stu-muted transition-colors hover:text-indigo-500"
               >
                 <Volume2 size={16} />
               </button>
             </div>
             {word.example && (
-              <p className="text-xs text-slate-500 italic text-center mt-3">"{word.example}"</p>
+              <p className="mt-3 text-center text-xs italic stu-muted">"{word.example}"</p>
             )}
           </div>
         </div>
@@ -142,7 +145,7 @@ function Flashcards({ words, onComplete }) {
       {/* Dot progress */}
       <div className="flex items-center gap-3 mb-4">
         <button onClick={prev} disabled={idx === 0}
-          className="p-2 rounded-xl border border-border text-slate-400 hover:bg-surface-200 disabled:opacity-30 transition">
+          className="rounded-xl border border-border p-2 stu-muted transition hover:bg-surface-200 disabled:opacity-30">
           <ChevronLeft size={18} />
         </button>
         <div className="flex-1 flex gap-1 justify-center flex-wrap">
@@ -204,24 +207,24 @@ function MCQQuiz({ words, mode, onComplete }) {
 
   return (
     <div>
-      <p className="text-xs font-bold text-slate-400 mb-1">{idx + 1} / {words.length}</p>
-      <p className="text-sm font-semibold text-slate-600 mb-5">{title}</p>
+      <p className="mb-1 text-xs font-bold stu-muted">{idx + 1} / {words.length}</p>
+      <p className="mb-5 text-sm font-semibold stu-body">{title}</p>
 
       {/* Question card */}
-      <div className="bg-gradient-to-br from-blue-50 to-violet-50 border border-blue-100 rounded-2xl p-6 mb-5 text-center relative group">
+      <div className="group relative mb-5 rounded-2xl border border-blue-500/20 bg-gradient-to-br from-blue-500/10 to-violet-500/10 p-6 text-center">
         <div className="flex items-center justify-center gap-3">
           <p className="text-3xl font-extrabold stu-title">{question}</p>
           {mode === 'en_to_uz' && (
             <button 
               onClick={() => speak(word.word)}
-              className="p-2 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors"
+              className="rounded-full bg-blue-500/15 p-2 text-blue-600 transition-colors hover:bg-blue-500/25 dark:text-blue-300"
             >
               <Volume2 size={20} />
             </button>
           )}
         </div>
         {mode === 'en_to_uz' && word.example && (
-          <p className="text-xs text-slate-400 italic mt-2">"{word.example}"</p>
+          <p className="mt-2 text-xs italic stu-muted">"{word.example}"</p>
         )}
       </div>
 
@@ -230,11 +233,11 @@ function MCQQuiz({ words, mode, onComplete }) {
         {options.map((opt, i) => {
           const isCorrect = opt === correct;
           const isChosen  = opt === selected;
-          let cls = 'border-slate-200 text-slate-700 hover:border-indigo-500/40 hover:bg-indigo-500/10 hover:scale-[1.02]';
+          let cls = 'border-border bg-surface-100 stu-body hover:border-indigo-500/40 hover:bg-indigo-500/10 hover:scale-[1.02]';
           if (isAnswered) {
-            if (isCorrect)             cls = 'border-green-400 bg-green-50 text-green-800 scale-[1.02]';
-            else if (isChosen)         cls = 'border-red-400 bg-red-50 text-red-700';
-            else                       cls = 'border-slate-100 text-slate-300 opacity-60';
+            if (isCorrect)             cls = 'border-green-500 bg-green-500/10 text-green-700 dark:text-green-300 scale-[1.02]';
+            else if (isChosen)         cls = 'border-red-500 bg-red-500/10 text-red-700 dark:text-red-300';
+            else                       cls = 'border-border bg-surface-200 stu-muted opacity-60';
           }
           return (
             <button key={i} onClick={() => handleSelect(opt)}
@@ -292,11 +295,11 @@ function TypingQuiz({ words, onComplete }) {
 
   return (
     <div>
-      <p className="text-xs font-bold text-slate-400 mb-1">{idx + 1} / {words.length}</p>
-      <p className="text-sm font-semibold text-slate-600 mb-5">✍️ O'zbekcha so'zni ko'rib, inglizcha yozing</p>
+      <p className="mb-1 text-xs font-bold stu-muted">{idx + 1} / {words.length}</p>
+      <p className="mb-5 text-sm font-semibold stu-body">✍️ O'zbekcha so'zni ko'rib, inglizcha yozing</p>
 
       {/* Question */}
-      <div className="bg-gradient-to-br from-orange-50 to-rose-50 border border-orange-100 rounded-2xl p-6 mb-5 text-center">
+      <div className="mb-5 rounded-2xl border border-orange-500/20 bg-gradient-to-br from-orange-500/10 to-rose-500/10 p-6 text-center">
         <p className="text-3xl font-extrabold stu-title">{word.translation}</p>
       </div>
 
@@ -314,22 +317,22 @@ function TypingQuiz({ words, onComplete }) {
             className={`w-full px-4 py-3.5 border-2 rounded-xl text-base font-semibold focus:outline-none transition-all ${
               checked
                 ? isCorrect
-                  ? 'border-green-400 bg-green-50 text-green-800'
-                  : 'border-red-400 bg-red-50 text-red-700'
-                : 'border-slate-200 focus:border-violet-400 focus:ring-2 focus:ring-violet-100'
+                  ? 'border-green-500 bg-green-500/10 text-green-700 dark:text-green-300'
+                  : 'border-red-500 bg-red-500/10 text-red-700 dark:text-red-300'
+                : 'border-border bg-surface-100 stu-body focus:border-violet-400 focus:ring-2 focus:ring-violet-500/20'
             }`}
           />
           {checked && (
             <button 
               onClick={() => speak(word.word)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-blue-500"
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-2 stu-muted hover:text-blue-500"
             >
               <Volume2 size={20} />
             </button>
           )}
         </div>
         {checked && !isCorrect && (
-          <p className="mt-2 text-sm text-green-700 font-semibold bg-green-50 px-3 py-1.5 rounded-lg">
+          <p className="mt-2 rounded-lg bg-green-500/10 px-3 py-1.5 text-sm font-semibold text-green-700 dark:text-green-300">
             ✅ To'g'ri javob: <span className="font-extrabold">{word.word}</span>
           </p>
         )}
@@ -337,8 +340,8 @@ function TypingQuiz({ words, onComplete }) {
 
       {/* Hint */}
       {!checked && input.length === 0 && (
-        <p className="text-xs text-slate-400 mb-3 font-medium">
-          💡 Birinchi harf: <span className="font-extrabold text-slate-600">{word.word[0].toUpperCase()}</span>
+        <p className="mb-3 text-xs font-medium stu-muted">
+          💡 Birinchi harf: <span className="font-extrabold stu-body">{word.word[0].toUpperCase()}</span>
           {'_ '.repeat(word.word.length - 1).trim()}
         </p>
       )}
@@ -373,14 +376,14 @@ function CompletionScreen({ onRestart }) {
     <div className="text-center py-10">
       <div className="text-6xl mb-4">🎉</div>
       <h3 className="text-2xl font-extrabold stu-title mb-2">Tabriklaymiz!</h3>
-      <p className="text-slate-500 mb-6">Barcha so'zlarni 4 bosqichda o'zlashtirdingiz!</p>
+      <p className="mb-6 stu-muted">Barcha so'zlarni 4 bosqichda o'zlashtirdingiz!</p>
       <div className="flex items-center justify-center gap-2 flex-wrap">
         {['🏆','⭐','🔥','💪','✨'].map((e,i) => (
           <span key={i} className="text-3xl animate-bounce" style={{ animationDelay: `${i*0.1}s` }}>{e}</span>
         ))}
       </div>
       <button onClick={onRestart}
-        className="mt-6 flex items-center gap-2 mx-auto px-6 py-2.5 border-2 border-slate-200 rounded-xl text-sm font-semibold text-slate-600 hover:bg-surface-200/50 transition">
+        className="mx-auto mt-6 flex items-center gap-2 rounded-xl border-2 border-border px-6 py-2.5 text-sm font-semibold stu-body transition hover:bg-surface-200/50">
         <RotateCcw size={15} /> Qayta o'rganish
       </button>
     </div>

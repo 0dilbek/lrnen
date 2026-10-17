@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework import permissions
 from .models import Comment
 from .serializers import CommentSerializer
+from accounts.permissions import is_platform_admin
 
 
 class CommentListView(APIView):
@@ -35,7 +36,7 @@ class CommentDetailView(APIView):
         obj = self.get_object(pk)
         if not obj:
             return Response({'detail': 'Not found'}, status=404)
-        if request.user.role != 'admin' and obj.user != request.user:
+        if not is_platform_admin(request.user) and obj.user != request.user:
             return Response({'detail': 'Forbidden'}, status=403)
         obj.delete()
         return Response(status=204)

@@ -12,6 +12,10 @@ DEBUG_VALUE = str(config('DEBUG', default='true')).strip().lower()
 DEBUG = DEBUG_VALUE in {'1', 'true', 'yes', 'on', 'debug', 'development'}
 
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='*').split(',')
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip() for origin in config('CSRF_TRUSTED_ORIGINS', default='').split(',')
+    if origin.strip()
+]
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -66,7 +70,7 @@ WSGI_APPLICATION = 'englishLMS.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'NAME': config('DATABASE_NAME', default=BASE_DIR / 'db.sqlite3'),
     }
 }
 
@@ -79,14 +83,23 @@ TIME_ZONE = 'Asia/Tashkent'
 USE_I18N = True
 USE_TZ = True
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+PROTECTED_MEDIA_URL_TTL = config('PROTECTED_MEDIA_URL_TTL', default=7200, cast=int)
+USE_X_ACCEL_REDIRECT = config('USE_X_ACCEL_REDIRECT', default=not DEBUG, cast=bool)
+MAX_IMAGE_UPLOAD_SIZE = config('MAX_IMAGE_UPLOAD_SIZE', default=15 * 1024 * 1024, cast=int)
+MAX_AUDIO_UPLOAD_SIZE = config('MAX_AUDIO_UPLOAD_SIZE', default=100 * 1024 * 1024, cast=int)
+MAX_VIDEO_UPLOAD_SIZE = config('MAX_VIDEO_UPLOAD_SIZE', default=1024 * 1024 * 1024, cast=int)
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # CORS
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = DEBUG
+CORS_ALLOWED_ORIGINS = [
+    origin.strip() for origin in config('CORS_ALLOWED_ORIGINS', default='').split(',')
+    if origin.strip()
+]
 
 # DRF
 REST_FRAMEWORK = {
@@ -109,3 +122,18 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [
     BASE_DIR / 'static',
 ]
+
+# Production security headers. HTTPS redirect is opt-in because TLS is usually
+# terminated by the VPS reverse proxy.
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'DENY'
+SECURE_REFERRER_POLICY = 'same-origin'
+SESSION_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SECURE = config('SESSION_COOKIE_SECURE', default=not DEBUG, cast=bool)
+CSRF_COOKIE_SECURE = config('CSRF_COOKIE_SECURE', default=not DEBUG, cast=bool)
+SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=False, cast=bool)
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SECURE_HSTS_SECONDS = config('SECURE_HSTS_SECONDS', default=0, cast=int)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = SECURE_HSTS_SECONDS > 0
+SECURE_HSTS_PRELOAD = SECURE_HSTS_SECONDS > 0

@@ -1,5 +1,7 @@
 from django.db import models
 from django.conf import settings
+from pathlib import Path
+import uuid
 
 
 class Category(models.Model):
@@ -37,7 +39,14 @@ class Level(models.Model):
 class Lesson(models.Model):
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
-    video_url = models.URLField(blank=True, null=True)
+    title_kaa = models.CharField(max_length=200, blank=True)
+    title_uz = models.CharField(max_length=200, blank=True)
+    description_kaa = models.TextField(blank=True)
+    description_uz = models.TextField(blank=True)
+    # YouTube URL yoki lokal /media/... yo'li.
+    video_url = models.CharField(max_length=500, blank=True, null=True)
+    video_url_kaa = models.CharField(max_length=500, blank=True, null=True)
+    video_url_uz = models.CharField(max_length=500, blank=True, null=True)
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, related_name='lessons')
     levels = models.ManyToManyField(Level, blank=True, related_name='lessons')
     order = models.PositiveIntegerField(default=0)
@@ -46,6 +55,20 @@ class Lesson(models.Model):
     def __str__(self):
         return self.title
 
+    def localized_title(self, language='kaa'):
+        return getattr(self, f'title_{language}', '') or self.title
+
+    def localized_description(self, language='kaa'):
+        return getattr(self, f'description_{language}', '') or self.description
+
+    def localized_video_url(self, language='kaa'):
+        localized = getattr(self, f'video_url_{language}', None)
+        if localized:
+            return localized
+        # Legacy rows belong to the Qoraqalpoq group only. Uzbek videos are
+        # intentionally left empty until an administrator uploads them.
+        return self.video_url if language == 'kaa' else None
+
     class Meta:
         ordering = ['order', 'created_at']
 
@@ -53,15 +76,22 @@ class Lesson(models.Model):
 class Vocabulary(models.Model):
     lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE, related_name='vocabulary')
     word = models.CharField(max_length=100)           # English
-    translation = models.CharField(max_length=200)    # Uzbek
+    translation = models.CharField(max_length=200)    # Legacy Qoraqalpoq value
+    translation_kaa = models.CharField(max_length=200, blank=True)
+    translation_uz = models.CharField(max_length=200, blank=True)
     example = models.TextField(blank=True)            # Example sentence (optional)
     order = models.PositiveIntegerField(default=0)
+    source = models.CharField(max_length=100, blank=True, db_index=True)
+    source_unit = models.PositiveSmallIntegerField(null=True, blank=True)
 
     class Meta:
         ordering = ['order', 'id']
 
     def __str__(self):
         return f"{self.word} — {self.translation}"
+
+    def localized_translation(self, language='kaa'):
+        return getattr(self, f'translation_{language}', '') or self.translation
 
 
 class UserProgress(models.Model):
@@ -78,3 +108,34 @@ class UserProgress(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.lesson.title} ({self.status})"
+
+
+def protected_asset_path(instance, filename):
+    extension = Path(filename).suffix.lower()[:12]
+    return f'protected/{instance.kind}/{uuid.uuid4().hex}{extension}'
+
+
+class MediaAsset(models.Model):
+    KIND_CHOICES = [
+        ('image', 'Image'),
+        ('audio', 'Audio'),
+        ('video', 'Video'),
+    ]
+    kind = models.CharField(max_length=10, choices=KIND_CHOICES)
+    file = models.FileField(upload_to=protected_asset_path)
+    original_name = models.CharField(max_length=255)
+    content_type = models.CharField(max_length=120, blank=True)
+    size = models.PositiveBigIntegerField(default=0)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='uploaded_media_assets',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.kind}: {self.original_name}'

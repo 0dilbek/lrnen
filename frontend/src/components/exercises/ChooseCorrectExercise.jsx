@@ -41,7 +41,10 @@ function normalizeItems(content) {
 
 export default function ChooseCorrectExercise({ exercise, onComplete }) {
   const sentences = normalizeItems(exercise.content);
-  const hasExample = sentences.length >= 2;
+  const exampleCount = Number.isInteger(exercise.content?.example_count)
+    ? exercise.content.example_count
+    : (sentences.length >= 2 ? 1 : 0);
+  const hasExample = exampleCount > 0;
   const exampleAnswer = useMemo(
     () => (hasExample ? { 0: sentences[0].correct } : {}),
     [hasExample, sentences]
@@ -51,23 +54,25 @@ export default function ChooseCorrectExercise({ exercise, onComplete }) {
   const [checked, setChecked] = useState(false);
 
   const select = (idx, optIdx) => {
-    if (checked || (hasExample && idx === 0)) return;
+    if (checked || idx < exampleCount) return;
     setAnswers((a) => ({ ...a, [idx]: optIdx }));
   };
 
-  const scorable = hasExample ? sentences.slice(1) : sentences;
+  const scorable = sentences.slice(exampleCount);
   const allAnswered = scorable.every((_, i) => {
-    const idx = hasExample ? i + 1 : i;
+    const idx = i + exampleCount;
     return answers[idx] !== undefined;
   });
 
   const handleCheck = () => {
     setChecked(true);
     const correct = scorable.filter((s, i) => {
-      const idx = hasExample ? i + 1 : i;
+      const idx = i + exampleCount;
       return answers[idx] === s.correct;
     }).length;
-    if (onComplete) onComplete(correct, scorable.length);
+    if (onComplete) onComplete(correct, scorable.length, {
+      answers: scorable.map((_, i) => answers[i + exampleCount]),
+    });
   };
 
   const handleRetry = () => {
@@ -77,7 +82,7 @@ export default function ChooseCorrectExercise({ exercise, onComplete }) {
 
   const score = checked
     ? scorable.filter((s, i) => {
-        const idx = hasExample ? i + 1 : i;
+      const idx = i + exampleCount;
         return answers[idx] === s.correct;
       }).length
     : null;
@@ -91,7 +96,7 @@ export default function ChooseCorrectExercise({ exercise, onComplete }) {
       )}
       <div className="space-y-4 mb-8">
         {sentences.map((s, i) => {
-          const isExample = hasExample && i === 0;
+          const isExample = i < exampleCount;
           const chosen = answers[i];
           const isCorrect = checked && chosen === s.correct;
           const isWrong = checked && !isExample && chosen !== s.correct && chosen !== undefined;
@@ -103,16 +108,16 @@ export default function ChooseCorrectExercise({ exercise, onComplete }) {
                 isExample
                   ? 'bg-amber-500/5 border-amber-500/30'
                   : isCorrect
-                    ? 'bg-emerald-50/50 border-emerald-200 shadow-sm'
+                    ? 'bg-emerald-500/10 border-emerald-500/35 shadow-sm'
                     : isWrong
-                      ? 'bg-rose-50/50 border-rose-200 shadow-sm'
+                      ? 'bg-rose-500/10 border-rose-500/35 shadow-sm'
                       : chosen !== undefined
-                        ? 'bg-indigo-50/30 border-indigo-200 shadow-sm'
+                        ? 'bg-indigo-500/10 border-indigo-500/30 shadow-sm'
                         : 'bg-surface-100 border-border hover:border-indigo-300 hover:shadow-md'
               }`}
             >
               <div className="flex flex-wrap items-center gap-2">
-                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-surface-200 text-slate-500 text-[10px] font-bold mr-1">
+                <span className="mr-1 flex h-6 w-6 items-center justify-center rounded-full bg-surface-200 text-[10px] font-bold stu-muted">
                   {i + 1}
                 </span>
                 {isExample && <ExampleBadge />}
@@ -138,7 +143,7 @@ export default function ChooseCorrectExercise({ exercise, onComplete }) {
                               : isSelected
                                 ? 'bg-indigo-600 text-white shadow-md'
                                 : checked
-                                  ? 'bg-surface-100 text-slate-400 cursor-default'
+                                  ? 'bg-surface-100 stu-muted cursor-default'
                                   : 'bg-surface-50 stu-body hover:text-indigo-600 hover:shadow-sm'
                         } ${isExample ? 'cursor-default' : ''}`}
                       >

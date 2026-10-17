@@ -1,0 +1,16 @@
+.git
+.env
+myenv
+__pycache__
+*.py[cod]
+*.pdf
+*.docx
+*.zip
+*.tar.gz
+scratch
+media
+frontend/node_modules
+frontend/dist
+frontend/.env
+book 1
+audio 1

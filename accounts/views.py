@@ -4,6 +4,7 @@ from rest_framework import status, permissions
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from .models import User
+from .permissions import IsPlatformAdmin
 from .serializers import (
     LoginSerializer, UserSerializer, UserDetailSerializer,
     CreateStudentSerializer, UpdateStudentSerializer,
@@ -54,15 +55,13 @@ class MeView(APIView):
 
 
 class StudentListView(APIView):
+    permission_classes = [IsPlatformAdmin]
+
     def get(self, request):
-        if request.user.role != 'admin':
-            return Response({'detail': 'Forbidden'}, status=403)
         students = User.objects.filter(role='student').order_by('-created_at')
         return Response(UserDetailSerializer(students, many=True).data)
 
     def post(self, request):
-        if request.user.role != 'admin':
-            return Response({'detail': 'Forbidden'}, status=403)
         serializer = CreateStudentSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         student = serializer.save()
@@ -70,6 +69,8 @@ class StudentListView(APIView):
 
 
 class StudentDetailView(APIView):
+    permission_classes = [IsPlatformAdmin]
+
     def _get_student(self, pk):
         try:
             return User.objects.get(pk=pk, role='student')
@@ -77,8 +78,6 @@ class StudentDetailView(APIView):
             return None
 
     def get(self, request, pk):
-        if request.user.role != 'admin':
-            return Response({'detail': 'Forbidden'}, status=403)
         student = self._get_student(pk)
         if not student:
             return Response({'detail': 'Not found'}, status=404)
@@ -87,12 +86,10 @@ class StudentDetailView(APIView):
         progress = UserProgress.objects.filter(user=student).select_related('lesson')
         return Response({
             'user': UserDetailSerializer(student).data,
-            'progress': UserProgressSerializer(progress, many=True).data,
+            'progress': UserProgressSerializer(progress, many=True, context={'request': request}).data,
         })
 
     def patch(self, request, pk):
-        if request.user.role != 'admin':
-            return Response({'detail': 'Forbidden'}, status=403)
         student = self._get_student(pk)
         if not student:
             return Response({'detail': 'Not found'}, status=404)
@@ -102,8 +99,6 @@ class StudentDetailView(APIView):
         return Response(UserDetailSerializer(student).data)
 
     def delete(self, request, pk):
-        if request.user.role != 'admin':
-            return Response({'detail': 'Forbidden'}, status=403)
         student = self._get_student(pk)
         if not student:
             return Response({'detail': 'Not found'}, status=404)

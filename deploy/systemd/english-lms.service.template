@@ -1,0 +1,33 @@
+[Unit]
+Description=English LMS Gunicorn application
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=__APP_USER__
+Group=www-data
+WorkingDirectory=__APP_DIR__
+EnvironmentFile=__APP_DIR__/.env
+RuntimeDirectory=english-lms
+RuntimeDirectoryMode=0750
+UMask=0007
+ExecStartPre=__APP_DIR__/.venv/bin/python manage.py check
+ExecStartPre=__APP_DIR__/.venv/bin/python manage.py migrate --noinput
+ExecStart=__APP_DIR__/.venv/bin/gunicorn \
+    --bind unix:/run/english-lms/gunicorn.sock \
+    --workers 3 \
+    --timeout 300 \
+    --access-logfile - \
+    --error-logfile - \
+    englishLMS.wsgi:application
+ExecReload=/bin/kill -s HUP $MAINPID
+KillSignal=SIGQUIT
+TimeoutStopSec=30
+Restart=on-failure
+RestartSec=5
+PrivateTmp=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

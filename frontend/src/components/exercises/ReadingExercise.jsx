@@ -15,7 +15,7 @@ export default function ReadingExercise({ exercise, onComplete }) {
           <p className="text-xs uppercase tracking-[.16em] font-black text-indigo-500">Topshiriqlar</p>
           <p className="text-sm stu-muted mt-1">Yuqoridagi sahifalarni o'qib, savollarga javob bering.</p>
         </div>
-        {hasQuestions && <ChooseCorrectExercise exercise={{ ...exercise, content: { questions: content.questions } }} onComplete={onComplete} />}
+        {hasQuestions && <ChooseCorrectExercise exercise={{ ...exercise, content: { questions: content.questions, example_count: content.example_count } }} onComplete={onComplete} />}
         {!hasQuestions && hasSentences && <FillBlankExercise exercise={{ ...exercise, content: { sentences: content.sentences, word_panel: content.word_panel } }} onComplete={onComplete} />}
         {!hasQuestions && !hasSentences && <p className="text-sm stu-muted text-center py-8">Savollar hali kiritilmagan.</p>}
       </div>

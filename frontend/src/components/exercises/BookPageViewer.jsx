@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ChevronLeft, ChevronRight, Maximize2, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { ProtectedMedia } from '../../context/MediaProtectionContext';
 
 function normalizePages(pages = []) {
   return pages
@@ -38,19 +39,19 @@ export default function BookPageViewer({ pages, title = "O'qish sahifalari" }) {
         </button>
       </div>
 
-      <div className="relative bg-slate-950/5 dark:bg-black/20 p-3 sm:p-5 flex justify-center">
+      <ProtectedMedia className="bg-slate-950/5 dark:bg-black/20 p-3 sm:p-5 flex justify-center">
         {normalized.length > 1 && <button type="button" onClick={() => move(-1)} aria-label="Oldingi sahifa" className="absolute left-3 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-black/65 text-white flex items-center justify-center hover:bg-indigo-600 transition"><ChevronLeft size={20} /></button>}
         <button type="button" onClick={() => setFullscreen(true)} className="cursor-zoom-in">
-          <img src={page.url} alt={page.caption || `${page.page_number || activeIndex + 1}-sahifa`} className="max-h-[70vh] w-auto max-w-full rounded-xl shadow-xl object-contain" />
+          <img src={page.url} alt={page.caption || `${page.page_number || activeIndex + 1}-sahifa`} draggable="false" className="max-h-[70vh] w-auto max-w-full rounded-xl shadow-xl object-contain" />
         </button>
         {normalized.length > 1 && <button type="button" onClick={() => move(1)} aria-label="Keyingi sahifa" className="absolute right-3 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-black/65 text-white flex items-center justify-center hover:bg-indigo-600 transition"><ChevronRight size={20} /></button>}
-      </div>
+      </ProtectedMedia>
 
       {normalized.length > 1 && (
         <div className="flex gap-2 p-3 border-t border-border overflow-x-auto">
           {normalized.map((item, index) => (
-            <button key={`${item.url}-${index}`} type="button" onClick={() => setActive(index)} className={`shrink-0 rounded-lg overflow-hidden border-2 transition ${activeIndex === index ? 'border-indigo-500 ring-2 ring-indigo-500/20' : 'border-border opacity-65 hover:opacity-100'}`}>
-              <img src={item.url} alt="" className="w-14 h-20 object-cover" />
+            <button key={`${item.url}-${index}`} data-protected-media type="button" onClick={() => setActive(index)} className={`shrink-0 rounded-lg overflow-hidden border-2 transition ${activeIndex === index ? 'border-indigo-500 ring-2 ring-indigo-500/20' : 'border-border opacity-65 hover:opacity-100'}`}>
+              <img src={item.url} alt="" draggable="false" className="w-14 h-20 object-cover" />
             </button>
           ))}
         </div>
@@ -67,9 +68,9 @@ export default function BookPageViewer({ pages, title = "O'qish sahifalari" }) {
               <button type="button" onClick={() => { setFullscreen(false); setZoom(1); }} className="p-2 rounded-lg hover:bg-red-500"><X size={22} /></button>
             </div>
           </div>
-          <div className="flex-1 overflow-auto p-6 flex items-start justify-center">
-            <img src={page.url} alt={page.caption || ''} style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }} className="max-w-full h-auto transition-transform" />
-          </div>
+          <ProtectedMedia className="flex-1 overflow-auto p-6 flex items-start justify-center">
+            <img src={page.url} alt={page.caption || ''} draggable="false" style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }} className="max-w-full h-auto transition-transform" />
+          </ProtectedMedia>
         </div>
       )}
     </div>

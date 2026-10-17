@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import User
+from .permissions import is_platform_admin
 
 
 def _levels_data(user):
@@ -13,41 +14,55 @@ class LoginSerializer(serializers.Serializer):
 
 class UserSerializer(serializers.ModelSerializer):
     levels = serializers.SerializerMethodField()
+    role = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'full_name', 'role', 'levels', 'created_at']
+        fields = ['id', 'username', 'full_name', 'role', 'language', 'levels', 'created_at']
         read_only_fields = ['id', 'role', 'created_at']
 
     def get_levels(self, obj):
         return _levels_data(obj)
 
+    def get_role(self, obj):
+        return 'admin' if is_platform_admin(obj) else 'student'
+
 
 class UserDetailSerializer(serializers.ModelSerializer):
     levels = serializers.SerializerMethodField()
+    role = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'full_name', 'role', 'levels', 'created_at']
+        fields = ['id', 'username', 'full_name', 'role', 'language', 'levels', 'created_at']
 
     def get_levels(self, obj):
         return _levels_data(obj)
+
+    def get_role(self, obj):
+        return 'admin' if is_platform_admin(obj) else 'student'
 
 
 class CreateStudentSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=4)
     level_ids = serializers.ListField(
-        child=serializers.IntegerField(), write_only=True, required=False, default=list
+        child=serializers.IntegerField(), write_only=True, allow_empty=False
     )
 
     class Meta:
         model = User
-        fields = ['username', 'full_name', 'password', 'level_ids']
+        fields = ['username', 'full_name', 'password', 'language', 'level_ids']
 
     def validate_username(self, value):
         if User.objects.filter(username=value).exists():
             raise serializers.ValidationError("Bu username band.")
         return value
+
+    def validate_level_ids(self, value):
+        from courses.models import Level
+        if Level.objects.filter(id__in=value).count() != len(set(value)):
+            raise serializers.ValidationError("Noto‘g‘ri daraja tanlangan.")
+        return list(dict.fromkeys(value))
 
     def create(self, validated_data):
         password = validated_data.pop('password')
@@ -64,12 +79,18 @@ class CreateStudentSerializer(serializers.ModelSerializer):
 class UpdateStudentSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=4, required=False)
     level_ids = serializers.ListField(
-        child=serializers.IntegerField(), write_only=True, required=False
+        child=serializers.IntegerField(), write_only=True, required=False, allow_empty=False
     )
 
     class Meta:
         model = User
-        fields = ['full_name', 'password', 'level_ids']
+        fields = ['full_name', 'password', 'language', 'level_ids']
+
+    def validate_level_ids(self, value):
+        from courses.models import Level
+        if Level.objects.filter(id__in=value).count() != len(set(value)):
+            raise serializers.ValidationError("Noto‘g‘ri daraja tanlangan.")
+        return list(dict.fromkeys(value))
 
     def update(self, instance, validated_data):
         password = validated_data.pop('password', None)

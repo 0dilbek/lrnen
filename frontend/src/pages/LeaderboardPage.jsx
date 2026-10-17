@@ -3,6 +3,7 @@ import api from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useGame } from '../context/GameContext';
 import { Loader2, Trophy, Zap } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
 
 const RANK_STYLE = [
   { bg: 'from-yellow-400 to-orange-400', label: '🥇' },
@@ -15,6 +16,7 @@ export default function LeaderboardPage() {
   const { xp: myXP } = useGame();
   const [board, setBoard] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { t } = useLanguage();
 
   useEffect(() => {
     api.get('/auth/leaderboard/').then(({ data }) => setBoard(data)).finally(() => setLoading(false));
@@ -36,8 +38,8 @@ export default function LeaderboardPage() {
     <div className="max-w-2xl mx-auto px-4 py-8">
       <div className="text-center mb-8">
         <div className="text-5xl mb-3">🏆</div>
-        <h1 className="text-2xl font-extrabold stu-title">Reyting jadvali</h1>
-        <p className="stu-muted mt-1">Eng ko'p XP to'plagan o'quvchilar</p>
+        <h1 className="text-2xl font-extrabold stu-title">{t('Reyting jadvali')}</h1>
+        <p className="stu-muted mt-1">{t("Eng ko'p XP to'plagan o'quvchilar")}</p>
       </div>
 
       {top3.length > 0 && (
@@ -50,14 +52,14 @@ export default function LeaderboardPage() {
 
       {myEntry && myEntry.rank > 3 && (
         <div className="bg-indigo-500/10 border-2 border-indigo-500/30 rounded-2xl px-5 py-4 mb-6 flex items-center gap-4">
-          <span className="text-2xl font-extrabold text-indigo-400">#{myEntry.rank}</span>
+          <span className="text-2xl font-extrabold text-indigo-600 dark:text-indigo-300">#{myEntry.rank}</span>
           <div className="flex-1">
-            <p className="font-bold stu-title">Siz 👤</p>
-            <p className="text-sm text-slate-400">@{myEntry.username}</p>
+            <p className="font-bold stu-title">{t('Siz')} 👤</p>
+            <p className="text-sm stu-muted">@{myEntry.username}</p>
           </div>
           <div className="text-right">
-            <p className="font-extrabold text-violet-400 flex items-center gap-1"><Zap size={14} />{myXP} XP</p>
-            <p className="text-xs text-slate-500">{myEntry.completed} dars</p>
+            <p className="flex items-center gap-1 font-extrabold text-violet-600 dark:text-violet-300"><Zap size={14} />{myXP} XP</p>
+            <p className="text-xs stu-muted">{myEntry.completed} {t('dars')}</p>
           </div>
         </div>
       )}
@@ -72,23 +74,23 @@ export default function LeaderboardPage() {
                   key={entry.id}
                   className={`px-5 py-4 flex items-center gap-4 ${isMe ? 'bg-indigo-500/10' : 'hover:bg-surface-200/40'} transition`}
                 >
-                  <span className={`w-8 text-center font-extrabold text-lg ${isMe ? 'text-indigo-400' : 'text-slate-500'}`}>
+                  <span className={`w-8 text-center font-extrabold text-lg ${isMe ? 'text-indigo-500 dark:text-indigo-300' : 'stu-muted'}`}>
                     #{entry.rank}
                   </span>
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white text-sm shrink-0 ${isMe ? 'bg-gradient-to-br from-indigo-500 to-violet-600' : 'bg-gradient-to-br from-slate-500 to-slate-600'}`}>
                     {(entry.full_name || entry.username)[0].toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className={`font-semibold truncate ${isMe ? 'text-indigo-600' : 'stu-title'}`}>
+                    <p className={`font-semibold truncate ${isMe ? 'text-indigo-600 dark:text-indigo-300' : 'stu-title'}`}>
                       {entry.full_name || entry.username} {isMe && '👤'}
                     </p>
-                    <p className="text-xs text-slate-500">@{entry.username}</p>
+                    <p className="text-xs stu-muted">@{entry.username}</p>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="font-extrabold text-violet-400 flex items-center gap-1 justify-end">
+                    <p className="flex items-center justify-end gap-1 font-extrabold text-violet-600 dark:text-violet-300">
                       <Zap size={12} />{entry.xp}
                     </p>
-                    <p className="text-xs text-slate-500">{entry.completed} dars</p>
+                    <p className="text-xs stu-muted">{entry.completed} {t('dars')}</p>
                   </div>
                 </div>
               );
@@ -98,9 +100,9 @@ export default function LeaderboardPage() {
       )}
 
       {board.length === 0 && (
-        <div className="text-center py-16 text-slate-500">
+        <div className="py-16 text-center stu-muted">
           <Trophy size={48} className="mx-auto mb-3 opacity-30" />
-          <p>Hali reyting mavjud emas</p>
+          <p>{t('Hali reyting mavjud emas')}</p>
         </div>
       )}
     </div>

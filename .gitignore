@@ -4,6 +4,7 @@ __pycache__/
 *.pyo
 db.sqlite3
 myenv/
+.venv/
 media/
 node_modules/
 frontend/dist/
@@ -19,9 +20,17 @@ Beginner vocabulary last one.docx
 
 # Build artifacts
 *.zip
+*.tar.gz
 dist/
+
+# Local coursebook source files (derived seed data is versioned separately)
+books/
+*.pdf
+*.docx
 
 # Generated / temporary files
 seed_book1_progress.json
+seed_book3_progress.json
+seed_book2_progress.json
 scratch/
 check_models.py

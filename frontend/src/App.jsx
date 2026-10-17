@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { LanguageProvider } from './context/LanguageContext';
 import { GameProvider } from './context/GameContext';
 import Navbar from './components/Navbar';
 import MobileNav from './components/MobileNav';
@@ -14,6 +15,7 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminStudents from './pages/admin/AdminStudents';
 import AdminStudentDetail from './pages/admin/AdminStudentDetail';
 import AdminLessons from './pages/admin/AdminLessons';
+import AdminNotifications from './pages/admin/AdminNotifications';
 import LeaderboardPage from './pages/LeaderboardPage';
 import { Loader2 } from 'lucide-react';
 
@@ -44,7 +46,7 @@ function Layout({ children }) {
   return (
     <div className="min-h-screen bg-surface">
       <Navbar />
-      <main className="pb-16 md:pb-0">{children}</main>
+      <main className="pb-20 md:pb-0">{children}</main>
       <MobileNav />
     </div>
   );
@@ -63,6 +65,7 @@ export default function App() {
     <BrowserRouter>
       <ThemeProvider>
       <AuthProvider>
+      <LanguageProvider>
       <GameProvider>
         <Routes>
           <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
@@ -97,10 +100,14 @@ export default function App() {
           <Route path="/admin/lessons" element={
             <AdminRoute title="Kontent boshqaruvi" subtitle="Darslar, mashqlar va lug'at"><AdminLessons /></AdminRoute>
           } />
+          <Route path="/admin/notifications" element={
+            <AdminRoute title="Notificationlar" subtitle="O‘quvchilar yakunlagan darslar va topshiriq tafsilotlari"><AdminNotifications /></AdminRoute>
+          } />
 
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </GameProvider>
+      </LanguageProvider>
       </AuthProvider>
       </ThemeProvider>
     </BrowserRouter>
