@@ -1,7 +1,11 @@
 import shutil
 import tempfile
+from io import StringIO
+from pathlib import Path
+from unittest.mock import patch
 
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.management import call_command
 from django.test import override_settings
 from django.urls import reverse
 from rest_framework.test import APITestCase
@@ -274,6 +278,64 @@ class ProtectedMediaTests(APITestCase):
         self.client.force_authenticate(self.admin)
         admin_response = self.client.get(reverse('lesson_list'))
         self.assertEqual(admin_response.data[0]['video_url'], '/media/protected/video/example.mp4')
+
+    @patch('courses.views.subprocess.run')
+    def test_admin_can_cut_and_store_audio_clip(self, run_mock):
+        source = Path(self.media_root) / 'source.mp3'
+        source.write_bytes(b'ID3 source audio')
+
+        def create_clip(arguments, **kwargs):
+            Path(arguments[-1]).write_bytes(b'ID3 generated clip')
+
+        run_mock.side_effect = create_clip
+        self.client.force_authenticate(self.admin)
+        response = self.client.post(reverse('media_audio_clip'), {
+            'source_url': '/media/source.mp3',
+            'start_seconds': 2.5,
+            'end_seconds': 7,
+            'name': 'question-2',
+        }, format='json')
+
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data['kind'], 'audio')
+        self.assertTrue(response.data['url'].startswith('/media/protected/audio/'))
+        self.assertTrue(MediaAsset.objects.get(pk=response.data['id']).file.storage.exists(
+            MediaAsset.objects.get(pk=response.data['id']).file.name
+        ))
+
+
+class ListeningAudioPartsCommandTests(APITestCase):
+    def test_existing_coursebook_tracks_are_aligned_with_example_and_questions(self):
+        temp_root = tempfile.mkdtemp(prefix='listening-parts-')
+        self.addCleanup(lambda: shutil.rmtree(temp_root, ignore_errors=True))
+        audio_dir = Path(temp_root) / 'static/audio/8'
+        audio_dir.mkdir(parents=True)
+        for name in ('8_8__eg.mp3', '8_8_1.mp3', '8_8_2.mp3'):
+            (audio_dir / name).write_bytes(b'ID3')
+        category = Category.objects.create(name='Audio course')
+        lesson = Lesson.objects.create(title='Audio lesson', category=category)
+        exercise = Exercise.objects.create(
+            lesson=lesson,
+            type='listening',
+            instruction='Listen',
+            audio_url='/static/audio/8/8_8_1.mp3',
+            has_audio=True,
+            content={'questions': [
+                {'question': 'Example', 'options': ['A', 'B'], 'correct': 0, 'is_example': True},
+                {'question': 'One', 'options': ['A', 'B'], 'correct': 0},
+                {'question': 'Two', 'options': ['A', 'B'], 'correct': 1},
+            ]},
+        )
+
+        with override_settings(BASE_DIR=Path(temp_root)):
+            call_command('attach_listening_audio_parts', stdout=StringIO())
+
+        exercise.refresh_from_db()
+        self.assertEqual(exercise.content['audio_urls'], [
+            '/static/audio/8/8_8__eg.mp3',
+            '/static/audio/8/8_8_1.mp3',
+            '/static/audio/8/8_8_2.mp3',
+        ])
 
 
 class LocalizedContentTests(APITestCase):

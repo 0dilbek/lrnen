@@ -5,7 +5,7 @@ import {
   X, Check,
   AlertTriangle, MousePointer, PenLine, GitMerge,
   Headphones, Mic, Volume2, BookMarked, Search, Music2,
-  ArrowUp, ArrowDown, UploadCloud, ListOrdered, FilePenLine,
+  ArrowUp, ArrowDown, UploadCloud, ListOrdered, FilePenLine, Scissors,
 } from 'lucide-react';
 
 const EXERCISE_TYPES = [
@@ -1059,7 +1059,7 @@ function ExerciseModal({ data, lessons, onClose, onSave }) {
           <MatchingEditor content={content} setContent={setContent} />
         )}
         {type === 'listening' && (
-          <ListeningEditor content={content} setContent={setContent} />
+          <ListeningEditor content={content} setContent={setContent} sourceAudioUrl={audioUrl} />
         )}
         {type === 'reading' && (
           <ReadingEditor content={content} setContent={setContent} />
@@ -1243,8 +1243,9 @@ function MatchingEditor({ content, setContent }) {
 }
 
 /* listening content editor */
-function ListeningEditor({ content, setContent, label = 'Tinglash savollari' }) {
+function ListeningEditor({ content, setContent, label = 'Tinglash savollari', sourceAudioUrl = '', enableRowAudio = true }) {
   const questions = content.questions || [];
+  const audioUrls = Array.isArray(content.audio_urls) ? content.audio_urls : [];
 
   const updateQ = (i, key, val) => {
     const qs = questions.map((q, qi) => qi === i ? { ...q, [key]: val } : q);
@@ -1258,10 +1259,21 @@ function ListeningEditor({ content, setContent, label = 'Tinglash savollari' }) 
     });
     setContent({ ...content, questions: qs });
   };
-  const addQuestion = () =>
-    setContent({ ...content, questions: [...questions, { question: '', options: ['', '', '', ''], correct: 0 }] });
-  const removeQuestion = (i) =>
-    setContent({ ...content, questions: questions.filter((_, qi) => qi !== i) });
+  const updateAudio = (index, url) => {
+    const next = Array.from({ length: questions.length }, (_, audioIndex) => audioUrls[audioIndex] || '');
+    next[index] = url;
+    setContent({ ...content, audio_urls: next });
+  };
+  const addQuestion = () => setContent({
+    ...content,
+    questions: [...questions, { question: '', options: ['', '', '', ''], correct: 0 }],
+    audio_urls: [...audioUrls, ''],
+  });
+  const removeQuestion = (i) => setContent({
+    ...content,
+    questions: questions.filter((_, qi) => qi !== i),
+    audio_urls: audioUrls.filter((_, audioIndex) => audioIndex !== i),
+  });
 
   return (
     <div className="space-y-3">
@@ -1275,6 +1287,14 @@ function ListeningEditor({ content, setContent, label = 'Tinglash savollari' }) 
             placeholder={`${i + 1}-savol matni`}
             className="admin-input-sm w-full"
           />
+          {enableRowAudio && (
+            <QuestionAudioEditor
+              value={audioUrls[i] || ''}
+              sourceAudioUrl={sourceAudioUrl}
+              name={`listening-${i + 1}`}
+              onChange={(url) => updateAudio(i, url)}
+            />
+          )}
           <p className="text-xs admin-text-muted">Variantlar (to'g'risini radio bilan belgilang):</p>
           <div className="space-y-1.5">
             {q.options.map((opt, oi) => (
@@ -1308,6 +1328,67 @@ function ListeningEditor({ content, setContent, label = 'Tinglash savollari' }) 
   );
 }
 
+function QuestionAudioEditor({ value, sourceAudioUrl, name, onChange }) {
+  const [open, setOpen] = useState(false);
+  const [start, setStart] = useState('0');
+  const [end, setEnd] = useState('5');
+  const [cutting, setCutting] = useState(false);
+  const [error, setError] = useState('');
+
+  const cut = async () => {
+    if (!sourceAudioUrl) {
+      setError('Avval yuqoridan asosiy audioni tanlang.');
+      return;
+    }
+    setCutting(true);
+    setError('');
+    try {
+      const { data } = await api.post('/courses/media-audio-clip/', {
+        source_url: sourceAudioUrl,
+        start_seconds: Number(start),
+        end_seconds: Number(end),
+        name,
+      });
+      onChange(data.url);
+    } catch (clipError) {
+      setError(getApiErrorMessage(clipError, 'Audio parchani yaratib bo‘lmadi.'));
+    } finally {
+      setCutting(false);
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-teal-500/25 bg-surface-100 p-2.5">
+      <button type="button" onClick={() => setOpen((current) => !current)} className="flex w-full items-center justify-between gap-3 text-left">
+        <span className="inline-flex items-center gap-2 text-xs font-bold text-teal-600 dark:text-teal-300">
+          <Volume2 size={13} /> {value ? 'Audio parcha biriktirilgan' : 'Bu savolga audio biriktirish'}
+        </span>
+        <span className="text-[11px] admin-text-muted">{open ? 'Yopish' : 'Sozlash'}</span>
+      </button>
+      {value && <audio src={value} controls preload="metadata" className="mt-2 h-8 w-full" />}
+      {open && (
+        <div className="mt-3 space-y-3 border-t border-border pt-3">
+          <input value={value} onChange={(event) => onChange(event.target.value)} placeholder="Audio URL" className="admin-input-sm w-full" />
+          <MediaUploadField kind="audio" accept="audio/*" label="Alohida audio fayl yuklash" onUploaded={(asset) => onChange(asset.url)} />
+          <div className="rounded-xl border border-dashed border-teal-500/30 bg-teal-500/5 p-3">
+            <p className="mb-2 flex items-center gap-2 text-xs font-bold text-teal-600 dark:text-teal-300"><Scissors size={14} /> Asosiy audiodan kesib olish</p>
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="Boshlanish (sekund)" value={start} onChange={setStart} type="number" />
+              <Field label="Tugash (sekund)" value={end} onChange={setEnd} type="number" />
+            </div>
+            <button type="button" onClick={cut} disabled={cutting || !sourceAudioUrl} className="admin-btn-primary mt-3 !px-3 !py-2 !text-xs disabled:opacity-50">
+              {cutting ? <Loader2 size={14} className="animate-spin" /> : <Scissors size={14} />}
+              Parchani yaratish va biriktirish
+            </button>
+            {!sourceAudioUrl && <p className="mt-2 text-[11px] text-amber-500">Asosiy Audio URL tanlanmagan.</p>}
+          </div>
+          {error && <p className="text-xs text-red-500">{error}</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ReadingEditor({ content, setContent }) {
   const usesWrittenAnswers = Array.isArray(content.sentences) && !content.questions?.length;
   return (
@@ -1324,7 +1405,7 @@ function ReadingEditor({ content, setContent }) {
       <BookPagePicker pages={content.pages || []} onChange={(pages) => setContent({ ...content, pages })} />
       {usesWrittenAnswers
         ? <FillBlankEditor content={content} setContent={setContent} />
-        : <ListeningEditor content={content} setContent={setContent} label="Reading savollari" />}
+        : <ListeningEditor content={content} setContent={setContent} label="Reading savollari" enableRowAudio={false} />}
     </div>
   );
 }

@@ -5,10 +5,14 @@ from rest_framework.parsers import FormParser, MultiPartParser
 from django.db.models import Min, Q
 from django.conf import settings
 from django.core import signing
+from django.core.files import File
 from django.http import FileResponse, HttpResponse
 from django.utils.http import content_disposition_header
 import mimetypes
+import subprocess
+import tempfile
 from pathlib import Path
+from urllib.parse import unquote, urlsplit
 from .models import Category, Lesson, UserProgress, Vocabulary, Level, MediaAsset
 from .serializers import CategorySerializer, LessonSerializer, UserProgressSerializer, VocabularySerializer, LevelSerializer
 from englishLMS.media_security import protected_media_url, resolve_protected_token
@@ -107,6 +111,76 @@ class MediaAssetDetailView(APIView):
         asset.file.delete(save=False)
         asset.delete()
         return Response(status=204)
+
+
+def _resolve_editable_audio(source_url):
+    url_path = unquote(urlsplit(str(source_url or '')).path)
+    locations = [
+        (settings.MEDIA_URL, Path(settings.MEDIA_ROOT)),
+        ('/static/', Path(settings.BASE_DIR) / 'static'),
+        (settings.STATIC_URL, Path(settings.STATIC_ROOT)),
+    ]
+    for prefix, root in locations:
+        if not prefix or not url_path.startswith(prefix):
+            continue
+        root = root.resolve()
+        candidate = (root / url_path[len(prefix):].lstrip('/')).resolve()
+        if candidate.is_relative_to(root) and candidate.is_file():
+            return candidate
+    return None
+
+
+class AudioClipCreateView(APIView):
+    permission_classes = [IsPlatformAdmin]
+
+    def post(self, request):
+        source = _resolve_editable_audio(request.data.get('source_url'))
+        if source is None:
+            return Response({'detail': 'Bo‘laklanadigan lokal audio topilmadi.'}, status=400)
+        if source.suffix.lower() not in MEDIA_RULES['audio']['extensions']:
+            return Response({'detail': 'Manba audio formati qo‘llab-quvvatlanmaydi.'}, status=400)
+        try:
+            start = float(request.data.get('start_seconds'))
+            end = float(request.data.get('end_seconds'))
+        except (TypeError, ValueError):
+            return Response({'detail': 'Boshlanish va tugash vaqtini son bilan kiriting.'}, status=400)
+        if start < 0 or end <= start:
+            return Response({'detail': 'Audio oralig‘i noto‘g‘ri.'}, status=400)
+        if end - start > 180:
+            return Response({'detail': 'Bitta audio parcha 3 daqiqadan oshmasligi kerak.'}, status=400)
+
+        safe_name = Path(str(request.data.get('name') or source.stem)).stem[:80]
+        try:
+            with tempfile.TemporaryDirectory(prefix='lrnen-audio-clip-') as temp_dir:
+                output = Path(temp_dir) / 'clip.mp3'
+                subprocess.run(
+                    [
+                        getattr(settings, 'FFMPEG_BINARY', 'ffmpeg'), '-y',
+                        '-ss', f'{start:.3f}', '-to', f'{end:.3f}', '-i', str(source),
+                        '-vn', '-codec:a', 'libmp3lame', '-q:a', '4', str(output),
+                    ],
+                    check=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.PIPE,
+                    timeout=90,
+                )
+                if not output.exists() or output.stat().st_size == 0:
+                    raise subprocess.CalledProcessError(1, 'ffmpeg')
+                with output.open('rb') as clip_file:
+                    asset = MediaAsset(
+                        kind='audio',
+                        original_name=f'{safe_name}-{start:g}-{end:g}.mp3',
+                        content_type='audio/mpeg',
+                        size=output.stat().st_size,
+                        uploaded_by=request.user,
+                    )
+                    asset.file.save(asset.original_name, File(clip_file), save=True)
+        except FileNotFoundError:
+            return Response({'detail': 'Serverda audio bo‘laklash dasturi o‘rnatilmagan.'}, status=503)
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+            return Response({'detail': 'Audio parchani yaratib bo‘lmadi.'}, status=400)
+
+        return Response(_asset_row(asset), status=201)
 
 
 class ProtectedMediaAccessView(APIView):

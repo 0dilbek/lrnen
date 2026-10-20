@@ -2,10 +2,12 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import permissions
 from django.conf import settings
+from django.core import signing
 from django.db import transaction
 from django.utils import timezone
 from pathlib import Path
 import re
+import secrets
 from .models import (
     AdminNotification,
     Exercise,
@@ -23,6 +25,40 @@ from accounts.permissions import IsPlatformAdmin, is_platform_admin
 
 
 # ── Quiz CRUD ─────────────────────────────────────────────────────────────────
+
+QUIZ_OPTION_ORDER_SALT = 'quiz-option-order-v1'
+
+
+def _student_quiz_row(quiz):
+    options = quiz.options if isinstance(quiz.options, list) else []
+    order = list(range(len(options)))
+    secrets.SystemRandom().shuffle(order)
+    return {
+        'id': quiz.id,
+        'lesson': quiz.lesson_id,
+        'question': quiz.question,
+        'options': [options[index] for index in order],
+        'option_order_token': signing.dumps(
+            {'quiz_id': quiz.id, 'order': order},
+            salt=QUIZ_OPTION_ORDER_SALT,
+            compress=True,
+        ),
+        '_order': order,
+    }
+
+
+def _answer_option_order(answer, quiz):
+    options = quiz.options if isinstance(quiz.options, list) else []
+    identity = list(range(len(options)))
+    token = answer.get('option_order_token')
+    if not token:
+        return identity
+    payload = signing.loads(token, salt=QUIZ_OPTION_ORDER_SALT, max_age=12 * 60 * 60)
+    order = payload.get('order') if isinstance(payload, dict) else None
+    if not isinstance(payload, dict) or payload.get('quiz_id') != quiz.id or sorted(order or []) != identity:
+        raise signing.BadSignature('Quiz variantlari mos kelmadi')
+    return order
+
 
 class QuizListView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -43,16 +79,17 @@ class QuizListView(APIView):
         qs = qs.filter(lesson_id__in=visible_ids)
 
         quizzes = list(qs)
-        data = QuizStudentSerializer(quizzes, many=True).data
+        data = [_student_quiz_row(quiz) for quiz in quizzes]
         # Birinchi savol — namuna (to'g'ri javob ko'rsatiladi)
         if quizzes:
             first_id = quizzes[0].id
             for row, quiz in zip(data, quizzes):
                 if quiz.id == first_id:
                     row['is_example'] = True
-                    row['correct_option_index'] = quiz.correct_option_index
+                    row['correct_option_index'] = row['_order'].index(quiz.correct_option_index)
                 else:
                     row['is_example'] = False
+                row.pop('_order', None)
         return Response(data)
 
     def post(self, request):
@@ -86,7 +123,9 @@ class QuizDetailView(APIView):
         )
         if obj.lesson_id not in visible_ids:
             return Response({'detail': 'Not found'}, status=404)
-        return Response(QuizStudentSerializer(obj).data)
+        data = _student_quiz_row(obj)
+        data.pop('_order', None)
+        return Response(data)
 
     def put(self, request, pk):
         if not is_platform_admin(request.user):
@@ -162,6 +201,7 @@ class QuizSubmitView(APIView):
             answers_by_id[quiz_id] = {
                 'quiz_id': quiz_id,
                 'selected_index': selected_index,
+                'option_order_token': answer.get('option_order_token'),
             }
 
         missing_quiz_ids = [
@@ -192,36 +232,47 @@ class QuizSubmitView(APIView):
             if not ans:
                 continue
             selected = ans.get('selected_index')
+            try:
+                option_order = _answer_option_order(ans, quiz)
+            except signing.BadSignature:
+                return Response({'detail': 'Test variantlari eskirgan yoki yaroqsiz. Sahifani yangilang.'}, status=400)
+            display_options = [quiz.options[index] for index in option_order]
+            correct_display_index = option_order.index(quiz.correct_option_index)
+            selected_original_index = (
+                option_order[selected]
+                if isinstance(selected, int) and 0 <= selected < len(option_order)
+                else None
+            )
             is_example = quiz.id == example_quiz_id
-            is_correct = quiz.correct_option_index == selected
+            is_correct = quiz.correct_option_index == selected_original_index
 
             if is_example:
                 # Namuna ballga kirmaydi, lekin to'g'ri deb yoziladi
-                selected = quiz.correct_option_index
+                selected = correct_display_index
                 is_correct = True
             else:
                 scored_total += 1
                 if is_correct:
                     correct_count += 1
 
-            opts = quiz.options if isinstance(quiz.options, list) else []
+            opts = display_options
             results.append({
                 'quiz_id': quiz.id,
                 'question': quiz.question,
                 'options': opts,
                 'selected_index': selected,
                 'selected_text': opts[selected] if opts and selected is not None and 0 <= selected < len(opts) else None,
-                'correct_index': quiz.correct_option_index,
-                'correct_text': opts[quiz.correct_option_index] if opts and 0 <= quiz.correct_option_index < len(opts) else None,
+                'correct_index': correct_display_index,
+                'correct_text': opts[correct_display_index] if opts else None,
                 'is_correct': is_correct,
                 'is_example': is_example,
             })
             answer_objs.append({
                 'quiz': quiz,
                 'question_snapshot': quiz.question,
-                'options_snapshot': quiz.options,
+                'options_snapshot': opts,
                 'selected_index': selected if selected is not None else -1,
-                'correct_index': quiz.correct_option_index,
+                'correct_index': correct_display_index,
                 'is_correct': is_correct,
             })
 

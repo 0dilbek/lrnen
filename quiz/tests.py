@@ -291,6 +291,42 @@ class QuizLessonUnlockTests(TestCase):
 
         self.assertEqual(response.status_code, 403)
 
+    def test_student_quiz_submission_uses_displayed_random_option_order(self):
+        response = self.client.get(f'/api/quiz/?lesson={self.first.id}')
+        self.assertEqual(response.status_code, 200, response.data)
+        scored_row = next(row for row in response.data if row['id'] == self.scored.id)
+        displayed_correct = scored_row['options'].index('Correct')
+
+        submit = self.client.post('/api/quiz/submit/', {
+            'lesson_id': self.first.id,
+            'answers': [{
+                'quiz_id': self.scored.id,
+                'selected_index': displayed_correct,
+                'option_order_token': scored_row['option_order_token'],
+            }],
+        }, format='json')
+
+        self.assertEqual(submit.status_code, 200, submit.data)
+        self.assertEqual(submit.data['score'], 100)
+        result = next(row for row in submit.data['results'] if row['quiz_id'] == self.scored.id)
+        self.assertEqual(result['options'], scored_row['options'])
+        self.assertEqual(result['correct_index'], displayed_correct)
+
+    def test_tampered_quiz_option_order_is_rejected(self):
+        response = self.client.get(f'/api/quiz/?lesson={self.first.id}')
+        scored_row = next(row for row in response.data if row['id'] == self.scored.id)
+
+        submit = self.client.post('/api/quiz/submit/', {
+            'lesson_id': self.first.id,
+            'answers': [{
+                'quiz_id': self.scored.id,
+                'selected_index': 0,
+                'option_order_token': f"{scored_row['option_order_token']}broken",
+            }],
+        }, format='json')
+
+        self.assertEqual(submit.status_code, 400)
+
     def test_incomplete_quiz_is_rejected_without_partial_attempt(self):
         response = self.client.post('/api/quiz/submit/', {
             'lesson_id': self.first.id,

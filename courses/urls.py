@@ -14,4 +14,5 @@ urlpatterns = [
     path('stats/', views.StatsView.as_view(), name='stats'),
     path('media-assets/', views.MediaAssetListView.as_view(), name='media_assets'),
     path('media-assets/<int:pk>/', views.MediaAssetDetailView.as_view(), name='media_asset_detail'),
+    path('media-audio-clip/', views.AudioClipCreateView.as_view(), name='media_audio_clip'),
 ]

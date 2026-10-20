@@ -266,6 +266,7 @@ export default function LessonPage() {
       lesson_id: Number(id),
       answers: quizzes.map((q) => ({
         quiz_id: q.id,
+        option_order_token: q.option_order_token,
         selected_index: q.is_example
           ? (q.correct_option_index ?? answers[q.id])
           : answers[q.id],

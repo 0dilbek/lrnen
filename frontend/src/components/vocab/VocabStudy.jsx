@@ -18,9 +18,13 @@ const speak = (text) => {
   window.speechSynthesis.speak(utterance);
 };
 
-function stableShuffle(values, seed) {
-  const score = (value) => [...String(value)].reduce((sum, char) => sum + char.charCodeAt(0), seed * 131) % 997;
-  return [...values].sort((a, b) => score(a) - score(b));
+function randomShuffle(values) {
+  const shuffled = [...values];
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const randomIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[index]];
+  }
+  return shuffled;
 }
 
 export default function VocabStudy({ words }) {
@@ -180,11 +184,15 @@ function MCQQuiz({ words, mode, onComplete }) {
 
   const options = useMemo(() => {
     const correct = mode === 'en_to_uz' ? word.translation : word.word;
-    const pool    = words.filter(w => w.id !== word.id)
-                         .map(w => mode === 'en_to_uz' ? w.translation : w.word);
-    const others  = stableShuffle(pool, idx + 1).slice(0, 3);
-    return stableShuffle([...others, correct], idx + 17);
-  }, [idx, words, mode, word]);
+    const pool = [...new Set(
+      words
+        .filter((candidate) => candidate.id !== word.id)
+        .map((candidate) => mode === 'en_to_uz' ? candidate.translation : candidate.word)
+        .filter((value) => value && value !== correct),
+    )];
+    const others = randomShuffle(pool).slice(0, 3);
+    return randomShuffle([...others, correct]);
+  }, [words, mode, word]);
 
   const question   = mode === 'en_to_uz' ? word.word      : word.translation;
   const correct    = mode === 'en_to_uz' ? word.translation : word.word;

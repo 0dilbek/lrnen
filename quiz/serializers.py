@@ -164,10 +164,24 @@ class ExerciseSerializer(serializers.ModelSerializer):
 
         if exercise_type == 'listening':
             audio_url = attrs.get('audio_url', getattr(self.instance, 'audio_url', None))
-            if not audio_url and not any(content.get('audio_urls') or []):
+            audio_urls = content.get('audio_urls') or []
+            if not audio_url and not any(audio_urls):
                 raise serializers.ValidationError({
                     'audio_url': "Listening uchun audio fayl yoki URL tanlang."
                 })
+            rows = (
+                content.get('questions') or content.get('items') or
+                content.get('sentences') or content.get('left') or []
+            )
+            if audio_urls:
+                if not isinstance(audio_urls, list) or len(audio_urls) != len(rows):
+                    raise serializers.ValidationError({
+                        'content': 'Har bir listening qatori uchun audio qismi tartibi saqlanishi kerak.'
+                    })
+                if any(not isinstance(url, str) for url in audio_urls):
+                    raise serializers.ValidationError({
+                        'content': 'Audio qismlar URL ko‘rinishida bo‘lishi kerak.'
+                    })
             if content.get('left'):
                 left, right, pairs = content.get('left') or [], content.get('right') or [], content.get('pairs') or []
                 if len(left) != len(pairs) or any(not isinstance(value, int) or not 0 <= value < len(right) for value in pairs):
