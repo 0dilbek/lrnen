@@ -13,6 +13,7 @@ import MyLessonsPage from './pages/MyLessonsPage';
 import ResultsPage from './pages/ResultsPage';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminStudents from './pages/admin/AdminStudents';
+import AdminGroups from './pages/admin/AdminGroups';
 import AdminStudentDetail from './pages/admin/AdminStudentDetail';
 import AdminLessons from './pages/admin/AdminLessons';
 import AdminNotifications from './pages/admin/AdminNotifications';
@@ -93,6 +94,9 @@ export default function App() {
           } />
           <Route path="/admin/students" element={
             <AdminRoute title="O'quvchilar" subtitle="Ro'yxatdan o'tganlar va faollik"><AdminStudents /></AdminRoute>
+          } />
+          <Route path="/admin/groups" element={
+            <AdminRoute title="Guruhlar" subtitle="Guruhlar va ochilgan darslar"><AdminGroups /></AdminRoute>
           } />
           <Route path="/admin/students/:id" element={
             <AdminRoute><AdminStudentDetail /></AdminRoute>

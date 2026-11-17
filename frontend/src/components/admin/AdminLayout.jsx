@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   BookOpen, LayoutDashboard, Users, BookMarked, LogOut,
-  Bell, ChevronRight, Shield, Sun, Moon, Menu, X,
+  Bell, ChevronRight, Shield, Sun, Moon, Menu, X, UsersRound,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -13,6 +13,7 @@ import { useLanguage } from '../../context/LanguageContext';
 const NAV = [
   { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', exact: true },
   { to: '/admin/students', icon: Users, label: "O‘quvchilar" },
+  { to: '/admin/groups', icon: UsersRound, label: 'Guruhlar' },
   { to: '/admin/notifications', icon: Bell, label: 'Notificationlar', notification: true },
   { to: '/admin/lessons', icon: BookMarked, label: 'Kontent' },
 ];

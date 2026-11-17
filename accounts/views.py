@@ -3,11 +3,12 @@ from rest_framework.response import Response
 from rest_framework import status, permissions
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
-from .models import User
+from django.shortcuts import get_object_or_404
+from .models import StudentGroup, User
 from .permissions import IsPlatformAdmin
 from .serializers import (
     LoginSerializer, UserSerializer, UserDetailSerializer,
-    CreateStudentSerializer, UpdateStudentSerializer,
+    CreateStudentSerializer, UpdateStudentSerializer, StudentGroupSerializer,
 )
 
 
@@ -58,7 +59,7 @@ class StudentListView(APIView):
     permission_classes = [IsPlatformAdmin]
 
     def get(self, request):
-        students = User.objects.filter(role='student').order_by('-created_at')
+        students = User.objects.filter(role='student').select_related('study_group').prefetch_related('levels').order_by('-created_at')
         return Response(UserDetailSerializer(students, many=True).data)
 
     def post(self, request):
@@ -73,7 +74,7 @@ class StudentDetailView(APIView):
 
     def _get_student(self, pk):
         try:
-            return User.objects.get(pk=pk, role='student')
+            return User.objects.select_related('study_group').prefetch_related('levels').get(pk=pk, role='student')
         except User.DoesNotExist:
             return None
 
@@ -104,6 +105,36 @@ class StudentDetailView(APIView):
             return Response({'detail': 'Not found'}, status=404)
         student.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class StudentGroupListView(APIView):
+    permission_classes = [IsPlatformAdmin]
+
+    def get(self, request):
+        groups = StudentGroup.objects.prefetch_related('students')
+        return Response(StudentGroupSerializer(groups, many=True).data)
+
+    def post(self, request):
+        serializer = StudentGroupSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=201)
+
+
+class StudentGroupDetailView(APIView):
+    permission_classes = [IsPlatformAdmin]
+
+    def patch(self, request, pk):
+        group = get_object_or_404(StudentGroup, pk=pk)
+        serializer = StudentGroupSerializer(group, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+    def delete(self, request, pk):
+        group = get_object_or_404(StudentGroup, pk=pk)
+        group.delete()
+        return Response(status=204)
 
 
 class LeaderboardView(APIView):

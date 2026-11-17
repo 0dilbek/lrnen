@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import api from '../../api';
+import api, { getApiErrorMessage } from '../../api';
 import {
   ArrowLeft, Loader2, CheckCircle, Clock, User,
   ChevronRight, ClipboardList, KeyRound, Trash2, Eye, EyeOff, X, BookOpen,
@@ -157,6 +157,9 @@ export default function AdminStudentDetail() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [data, setData] = useState(null);
   const [allLevels, setAllLevels] = useState([]);
+  const [allGroups, setAllGroups] = useState([]);
+  const [savingGroup, setSavingGroup] = useState(false);
+  const [groupError, setGroupError] = useState('');
   const [quizAttempts, setQuizAttempts] = useState([]);
   const [exerciseAttempts, setExerciseAttempts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -171,11 +174,13 @@ export default function AdminStudentDetail() {
       api.get('/courses/levels/'),
       api.get(`/quiz/attempts/?student_id=${id}`),
       api.get(`/quiz/exercise-attempts/?student_id=${id}`),
-    ]).then(([studentRes, levelsRes, quizRes, exerciseRes]) => {
+      api.get('/auth/student-groups/'),
+    ]).then(([studentRes, levelsRes, quizRes, exerciseRes, groupsRes]) => {
       setData(studentRes.data);
       setAllLevels(levelsRes.data);
       setQuizAttempts(quizRes.data);
       setExerciseAttempts(exerciseRes.data);
+      setAllGroups(groupsRes.data);
     }).finally(() => setLoading(false));
   }, [id]);
 
@@ -206,6 +211,16 @@ export default function AdminStudentDetail() {
     } finally {
       setSavingLanguage(false);
     }
+  };
+
+  const handleGroupChange = async (groupId) => {
+    setSavingGroup(true);
+    setGroupError('');
+    try {
+      const { data: updatedUser } = await api.patch(`/auth/students/${id}/`, { group_id: groupId ? Number(groupId) : null });
+      setData((previous) => ({ ...previous, user: updatedUser }));
+    } catch (error) { setGroupError(getApiErrorMessage(error, 'Guruhni saqlab bo‘lmadi.')); }
+    finally { setSavingGroup(false); }
   };
 
   if (loading) {
@@ -270,6 +285,16 @@ export default function AdminStudentDetail() {
           </div>
         </div>
 
+        <div className="mt-5 border-t border-border pt-5">
+          <label htmlFor="student-group" className="mb-2 block text-sm font-semibold admin-text-body">Guruh</label>
+          <select id="student-group" value={user.group?.id || ''} disabled={savingGroup} onChange={(event) => handleGroupChange(event.target.value)} className="admin-input">
+            <option value="">Guruhsiz</option>
+            {allGroups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
+          </select>
+          {savingGroup && <p className="mt-2 text-xs admin-text-muted">Saqlanmoqda...</p>}
+          {groupError && <p role="alert" className="mt-2 text-xs text-red-500">{groupError}</p>}
+          <p className="mt-2 text-xs admin-text-muted">O‘quvchi tanlangan guruhning dars chegarasi bo‘yicha o‘qiydi.</p>
+        </div>
         <div className="mt-5 pt-5 border-t border-border">
           <div className="flex items-center justify-between mb-2">
             <p className="text-sm font-semibold admin-text-body flex items-center gap-1.5">

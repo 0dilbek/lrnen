@@ -72,8 +72,8 @@ export default function AdminDashboard() {
             <Settings2 size={22} />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="font-semibold admin-text-title">Hozirgi darsni belgilash</p>
-            <p className="text-sm admin-text-muted mt-0.5">Har bir darajada o‘quvchilar qaysi darsgacha kira olishini boshqaring</p>
+            <p className="font-semibold admin-text-title">Guruhsiz o‘quvchilar uchun hozirgi dars</p>
+            <p className="text-sm admin-text-muted mt-0.5">Darajalar bo‘yicha umumiy chegara. Guruhga biriktirilgan o‘quvchilar uchun guruh sozlamasi qo‘llanadi.</p>
             <div className="mt-3 flex flex-wrap gap-2">
               {releaseSettings.map((level) => (
                 <span key={level.id} className="rounded-full border border-border bg-surface-200/70 px-2.5 py-1 text-xs font-bold admin-text-muted">
@@ -84,6 +84,12 @@ export default function AdminDashboard() {
           </div>
           <ArrowRight size={18} className="admin-text-muted transition group-hover:text-indigo-500" />
         </button>
+        <QuickLink
+          to="/admin/groups"
+          icon={<Users size={22} />}
+          title="Guruhlar va darslar"
+          desc="O‘quvchilarni guruhlash, har bir guruh uchun darslarni alohida ochish"
+        />
         <QuickLink
           to="/admin/students"
           icon={<Users size={22} />}
@@ -220,7 +226,7 @@ function LessonReleaseModal({ levels, onClose, onUpdated }) {
         </div>
 
         <div className="flex items-center justify-between gap-3 border-t border-border px-5 py-4 sm:px-7">
-          <p className="hidden text-xs admin-text-muted sm:block">O‘zgarish shu darajadagi barcha o‘quvchilarga darhol ta’sir qiladi.</p>
+          <p className="hidden text-xs admin-text-muted sm:block">O‘zgarish shu darajadagi guruhsiz o‘quvchilarga darhol ta’sir qiladi.</p>
           <button
             type="button"
             onClick={save}

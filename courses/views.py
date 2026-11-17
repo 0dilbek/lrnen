@@ -1,19 +1,20 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status, permissions
+from rest_framework import status, permissions, serializers
 from rest_framework.parsers import FormParser, MultiPartParser
 from django.db.models import Min, Q
 from django.conf import settings
 from django.core import signing
 from django.core.files import File
 from django.http import FileResponse, HttpResponse
+from django.shortcuts import get_object_or_404
 from django.utils.http import content_disposition_header
 import mimetypes
 import subprocess
 import tempfile
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
-from .models import Category, Lesson, UserProgress, Vocabulary, Level, MediaAsset
+from .models import Category, Lesson, UserProgress, Vocabulary, Level, MediaAsset, GroupLessonRelease
 from .serializers import CategorySerializer, LessonSerializer, UserProgressSerializer, VocabularySerializer, LevelSerializer
 from englishLMS.media_security import protected_media_url, resolve_protected_token
 from accounts.permissions import IsPlatformAdmin, is_platform_admin
@@ -315,9 +316,16 @@ def _release_gate_context(user):
         return {}
 
     context = {}
+    group_id = user.study_group_id
+    group_releases = {}
+    if group_id:
+        group_releases = {
+            release.level_id: release.current_lesson
+            for release in GroupLessonRelease.objects.filter(group_id=group_id).select_related('current_lesson')
+        }
     levels = Level.objects.filter(id__in=_student_level_ids(user)).select_related('current_lesson')
     for level in levels:
-        current = level.current_lesson
+        current = group_releases.get(level.id) if group_id else level.current_lesson
         if current is None or not current.levels.filter(id=level.id).exists():
             current = level.lessons.order_by('order', 'id').first()
         context[level.id] = (current.order, current.id) if current else None
@@ -436,9 +444,12 @@ def _get_next_lesson(user, lesson):
     return None
 
 
-def _release_setting_row(level, request):
+def _release_setting_row(level, request, group=None, group_releases=None):
     lessons = list(level.lessons.order_by('order', 'id'))
-    current = level.current_lesson if level.current_lesson_id else None
+    if group is not None:
+        current = (group_releases or {}).get(level.id)
+    else:
+        current = level.current_lesson if level.current_lesson_id else None
     if current is None or current not in lessons:
         current = lessons[0] if lessons else None
     language = getattr(request.user, 'language', 'kaa')
@@ -446,6 +457,7 @@ def _release_setting_row(level, request):
         'id': level.id,
         'slug': level.slug,
         'name': str(level),
+        'group_id': group.id if group is not None else None,
         'current_lesson_id': current.id if current else None,
         'current_lesson_title': current.localized_title(language) if current else None,
         'lessons': [
@@ -462,11 +474,24 @@ def _release_setting_row(level, request):
 class LessonReleaseSettingsView(APIView):
     permission_classes = [IsPlatformAdmin]
 
+    def _get_group(self, value):
+        if value is None:
+            return None
+        from accounts.models import StudentGroup
+        group_id = serializers.IntegerField(min_value=1).run_validation(value)
+        return get_object_or_404(StudentGroup, pk=group_id)
+
     def get(self, request):
+        group = self._get_group(request.query_params.get('group_id'))
+        releases = {
+            release.level_id: release.current_lesson
+            for release in GroupLessonRelease.objects.filter(group=group).select_related('current_lesson')
+        } if group is not None else {}
         levels = Level.objects.select_related('current_lesson').prefetch_related('lessons')
-        return Response([_release_setting_row(level, request) for level in levels])
+        return Response([_release_setting_row(level, request, group, releases) for level in levels])
 
     def patch(self, request):
+        group = self._get_group(request.data.get('group_id'))
         level_id = request.data.get('level_id')
         lesson_id = request.data.get('current_lesson_id')
         try:
@@ -481,9 +506,14 @@ class LessonReleaseSettingsView(APIView):
                 status=400,
             )
 
+        if group is not None:
+            GroupLessonRelease.objects.update_or_create(
+                group=group, level=level, defaults={'current_lesson': lesson},
+            )
+            return Response(_release_setting_row(level, request, group, {level.id: lesson}))
+
         level.current_lesson = lesson
         level.save(update_fields=['current_lesson'])
-        level.refresh_from_db()
         return Response(_release_setting_row(level, request))
 
 
@@ -614,6 +644,11 @@ class VocabularyListView(APIView):
     def get(self, request):
         lesson_id = request.query_params.get('lesson')
         qs = Vocabulary.objects.all()
+        if not is_platform_admin(request.user) and not lesson_id:
+            visible_ids = _get_visible_lesson_ids(
+                request.user, list(_student_lessons_queryset(request.user)),
+            )
+            qs = qs.filter(lesson_id__in=visible_ids)
         if lesson_id:
             if not is_platform_admin(request.user):
                 try:

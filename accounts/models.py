@@ -2,6 +2,17 @@ from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, Permis
 from django.db import models
 
 
+class StudentGroup(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['name', 'id']
+
+    def __str__(self):
+        return self.name
+
+
 class UserManager(BaseUserManager):
     def create_user(self, username, full_name='', password=None, **extra):
         if not username:
@@ -37,6 +48,10 @@ class User(AbstractBaseUser, PermissionsMixin):
     created_at = models.DateTimeField(auto_now_add=True)
 
     levels = models.ManyToManyField('courses.Level', blank=True, related_name='students')
+    study_group = models.ForeignKey(
+        StudentGroup, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='students',
+    )
 
     objects = UserManager()
 

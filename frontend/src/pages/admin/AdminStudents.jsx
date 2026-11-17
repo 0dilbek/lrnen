@@ -67,8 +67,8 @@ function DarkModal({ title, onClose, children }) {
   );
 }
 
-function AddStudentModal({ onClose, onCreated }) {
-  const [form, setForm] = useState({ full_name: '', username: '', password: '', language: 'kaa' });
+function AddStudentModal({ onClose, onCreated, groups }) {
+  const [form, setForm] = useState({ full_name: '', username: '', password: '', language: 'kaa', group_id: '' });
   const [selectedLevels, setSelectedLevels] = useState([]);
   const [levels, setLevels] = useState([]);
   const [showPass, setShowPass] = useState(false);
@@ -96,7 +96,7 @@ function AddStudentModal({ onClose, onCreated }) {
     setLoading(true);
     setError('');
     try {
-      const { data } = await api.post('/auth/students/', { ...form, level_ids: selectedLevels });
+      const { data } = await api.post('/auth/students/', { ...form, group_id: form.group_id ? Number(form.group_id) : null, level_ids: selectedLevels });
       onCreated(data);
       onClose();
     } catch (err) {
@@ -149,6 +149,13 @@ function AddStudentModal({ onClose, onCreated }) {
           <select value={form.language} onChange={set('language')} className="admin-input">
             <option value="kaa">Qoraqalpoqcha</option>
             <option value="uz">O‘zbekcha</option>
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium admin-text-muted">Guruh</label>
+          <select value={form.group_id} onChange={set('group_id')} className="admin-input">
+            <option value="">Guruhsiz</option>
+            {groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
           </select>
         </div>
         {levels.length > 0 && (
@@ -207,6 +214,8 @@ function ChangePasswordModal({ student, onClose }) {
 
 export default function AdminStudents() {
   const [students, setStudents] = useState([]);
+  const [groups, setGroups] = useState([]);
+  const [groupFilter, setGroupFilter] = useState('');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
@@ -216,8 +225,8 @@ export default function AdminStudents() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    api.get('/auth/students/')
-      .then(({ data }) => setStudents(data))
+    Promise.all([api.get('/auth/students/'), api.get('/auth/student-groups/')])
+      .then(([studentResponse, groupResponse]) => { setStudents(studentResponse.data); setGroups(groupResponse.data); })
       .catch((error) => setPageError(
         error.response?.status === 403
           ? 'Bu tabdagi sessiya administratorga tegishli emas. Admin akkaunt bilan qayta kiring.'
@@ -238,8 +247,9 @@ export default function AdminStudents() {
 
   const filtered = students.filter(
     (s) =>
-      (s.username || '').toLowerCase().includes(search.toLowerCase()) ||
-      (s.full_name || '').toLowerCase().includes(search.toLowerCase()),
+      ((s.username || '').toLowerCase().includes(search.toLowerCase()) ||
+      (s.full_name || '').toLowerCase().includes(search.toLowerCase())) &&
+      (!groupFilter || (groupFilter === 'none' ? !s.group : s.group?.id === Number(groupFilter))),
   );
 
   if (loading) {
@@ -252,7 +262,7 @@ export default function AdminStudents() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
-      {showAdd && <AddStudentModal onClose={() => setShowAdd(false)} onCreated={(s) => setStudents((p) => [s, ...p])} />}
+      {showAdd && <AddStudentModal groups={groups} onClose={() => setShowAdd(false)} onCreated={(s) => setStudents((p) => [s, ...p])} />}
       {changePassFor && <ChangePasswordModal student={changePassFor} onClose={() => setChangePassFor(null)} />}
 
       <div className="flex items-center justify-between mb-6">
@@ -268,7 +278,8 @@ export default function AdminStudents() {
         </div>
       )}
 
-      <div className="relative mb-6">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row">
+      <div className="relative flex-1">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 admin-text-muted" size={18} />
         <input
           type="text"
@@ -277,6 +288,12 @@ export default function AdminStudents() {
           placeholder="Ism yoki login bo'yicha qidirish..."
           className="admin-input pl-10"
         />
+      </div>
+      <select aria-label="Guruh bo‘yicha filtrlash" value={groupFilter} onChange={(event) => setGroupFilter(event.target.value)} className="admin-input sm:!w-56">
+        <option value="">Barcha guruhlar</option>
+        <option value="none">Guruhsiz</option>
+        {groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
+      </select>
       </div>
 
       {filtered.length === 0 ? (
@@ -299,6 +316,7 @@ export default function AdminStudents() {
                     {student.language === 'uz' ? 'O‘zbekcha' : 'Qoraqalpoqcha'}
                   </span>
                   {student.levels?.map((lvl) => <LevelBadge key={lvl.slug} level={lvl} />)}
+                  <span className="rounded-full border border-indigo-500/20 bg-indigo-500/10 px-2 py-0.5 text-xs font-semibold text-indigo-600 dark:text-indigo-300">{student.group?.name || 'Guruhsiz'}</span>
                 </div>
               </div>
               <p className="hidden shrink-0 text-xs admin-text-muted sm:block">

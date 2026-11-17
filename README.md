@@ -56,7 +56,14 @@ lrnen/
 - **Lesson comments** — per-lesson discussion thread
 - **Role-based access** — Admin vs Student permissions throughout
 - **Admin panel** — full CRUD for all content + student management
+- **Student groups** — bulk membership management and independent lesson release limits for each group and level
 - **Responsive UI** — desktop Navbar + mobile MobileNav
+
+### Group lesson access
+
+Open **Admin → Guruhlar**, create a group, select its students, then choose the current lesson in each level tab and save. For example, one A1 group can have access through lesson 10 while another has access through lesson 15. Each new group's default limit is the first lesson of each level. Group limits replace the global release limit for members; students without a group keep the global limit. Students still need to pass the previous lesson's test with at least 60%.
+
+Students retain their individual assigned levels and all progress when transferred between groups. Deleting a group unassigns its students without deleting their accounts or results. Group membership can also be selected when creating a student or changed on the student's detail page.
 
 ---
 

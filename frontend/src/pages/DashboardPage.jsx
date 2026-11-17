@@ -108,8 +108,10 @@ export default function DashboardPage() {
     (lesson) => progress[lesson.id]?.status !== 'completed' && !lesson.is_locked,
   );
   const currentLesson = currentLessonIndex >= 0 ? lessons[currentLessonIndex] : null;
+  const waitingForRelease = !currentLesson && lessons.some((lesson) => lesson.is_locked);
   const upcomingLessons = currentLesson
     ? lessons.slice(currentLessonIndex + 1, currentLessonIndex + 4)
+    : waitingForRelease ? lessons.filter((lesson) => lesson.is_locked).slice(0, 3)
     : lessons.slice(-3).reverse();
   const firstName = (user?.full_name || user?.username || 'O‘quvchi').split(' ')[0];
   const currentLevel = currentLesson?.levels?.[0]?.name || 'Shaxsiy o‘quv yo‘li';
@@ -140,11 +142,13 @@ export default function DashboardPage() {
             <h1 className="max-w-xl text-3xl font-black leading-[1.08] sm:text-4xl lg:text-5xl">
               {currentLesson
                 ? t('Ingliz tilida navbatdagi qadamingiz tayyor.')
+                : waitingForRelease ? t('Keyingi dars ochilishini kuting')
                 : t('Ajoyib natija — barcha darslar yakunlandi!')}
             </h1>
             <p className="mt-4 max-w-lg text-sm leading-relaxed text-indigo-100 sm:text-base">
               {currentLesson
                 ? `${currentLessonIndex + 1}-dars — ${formatLessonTitle(currentLesson.title)}. O‘rganishni to‘xtagan joyingizdan davom ettiring.`
+                : waitingForRelease ? t('Ochiq darslarni yakunladingiz. Administrator keyingi mavzuni ochganda davom etasiz.')
                 : 'Natijalaringizni ko‘ring va erishgan yutuqlaringizni yana bir bor nishonlang.'}
             </p>
 
@@ -210,7 +214,7 @@ export default function DashboardPage() {
             <div>
               <p className="text-xs font-extrabold uppercase tracking-[.14em] text-indigo-500 dark:text-indigo-300">{t('O‘quv yo‘lingiz')}</p>
               <h2 className="stu-title mt-1 text-xl font-black sm:text-2xl">
-                {currentLesson ? t('Oldinda nimalar bor?') : t('So‘nggi marralaringiz')}
+                {currentLesson || waitingForRelease ? t('Oldinda nimalar bor?') : t('So‘nggi marralaringiz')}
               </h2>
             </div>
             <button

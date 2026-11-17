@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from .models import User
+from django.db import transaction
+from .models import StudentGroup, User
 from .permissions import is_platform_admin
 
 
@@ -12,13 +13,61 @@ class LoginSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True)
 
 
+class StudentGroupSummarySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = StudentGroup
+        fields = ['id', 'name']
+
+
+class StudentGroupSerializer(serializers.ModelSerializer):
+    student_ids = serializers.PrimaryKeyRelatedField(
+        source='students', many=True, required=False,
+        queryset=User.objects.filter(role='student', is_staff=False, is_superuser=False),
+    )
+    student_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = StudentGroup
+        fields = ['id', 'name', 'student_count', 'student_ids']
+        read_only_fields = ['id']
+
+    def get_student_count(self, obj):
+        return obj.students.count()
+
+    @staticmethod
+    def _set_students(group, students):
+        if students is None:
+            return
+        ids = [student.id for student in students]
+        # A transfer changes membership only; levels and past results stay intact.
+        User.objects.filter(study_group=group).exclude(id__in=ids).update(study_group=None)
+        User.objects.filter(id__in=ids).update(study_group=group)
+        if hasattr(group, '_prefetched_objects_cache'):
+            group._prefetched_objects_cache.pop('students', None)
+
+    @transaction.atomic
+    def create(self, validated_data):
+        students = validated_data.pop('students', None)
+        group = StudentGroup.objects.create(**validated_data)
+        self._set_students(group, students)
+        return group
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        students = validated_data.pop('students', None)
+        instance = super().update(instance, validated_data)
+        self._set_students(instance, students)
+        return instance
+
+
 class UserSerializer(serializers.ModelSerializer):
     levels = serializers.SerializerMethodField()
     role = serializers.SerializerMethodField()
+    group = StudentGroupSummarySerializer(source='study_group', read_only=True)
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'full_name', 'role', 'language', 'levels', 'created_at']
+        fields = ['id', 'username', 'full_name', 'role', 'language', 'levels', 'group', 'created_at']
         read_only_fields = ['id', 'role', 'created_at']
 
     def get_levels(self, obj):
@@ -31,10 +80,11 @@ class UserSerializer(serializers.ModelSerializer):
 class UserDetailSerializer(serializers.ModelSerializer):
     levels = serializers.SerializerMethodField()
     role = serializers.SerializerMethodField()
+    group = StudentGroupSummarySerializer(source='study_group', read_only=True)
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'full_name', 'role', 'language', 'levels', 'created_at']
+        fields = ['id', 'username', 'full_name', 'role', 'language', 'levels', 'group', 'created_at']
 
     def get_levels(self, obj):
         return _levels_data(obj)
@@ -48,10 +98,13 @@ class CreateStudentSerializer(serializers.ModelSerializer):
     level_ids = serializers.ListField(
         child=serializers.IntegerField(), write_only=True, allow_empty=False
     )
+    group_id = serializers.PrimaryKeyRelatedField(
+        source='study_group', queryset=StudentGroup.objects.all(), required=False, allow_null=True,
+    )
 
     class Meta:
         model = User
-        fields = ['username', 'full_name', 'password', 'language', 'level_ids']
+        fields = ['username', 'full_name', 'password', 'language', 'level_ids', 'group_id']
 
     def validate_username(self, value):
         if User.objects.filter(username=value).exists():
@@ -81,10 +134,13 @@ class UpdateStudentSerializer(serializers.ModelSerializer):
     level_ids = serializers.ListField(
         child=serializers.IntegerField(), write_only=True, required=False, allow_empty=False
     )
+    group_id = serializers.PrimaryKeyRelatedField(
+        source='study_group', queryset=StudentGroup.objects.all(), required=False, allow_null=True,
+    )
 
     class Meta:
         model = User
-        fields = ['full_name', 'password', 'language', 'level_ids']
+        fields = ['full_name', 'password', 'language', 'level_ids', 'group_id']
 
     def validate_level_ids(self, value):
         from courses.models import Level

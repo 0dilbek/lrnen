@@ -65,15 +65,15 @@ function buildPath(count, xPattern) {
 }
 
 function getLessonState(lesson, lessonProgress, currentLessonId) {
-  if (lessonProgress?.status === 'completed') return 'completed';
   if (lesson.is_locked) return 'locked';
+  if (lessonProgress?.status === 'completed') return 'completed';
   if (lesson.id === currentLessonId) return 'current';
   return 'available';
 }
 
-function stateLabel(state, t) {
+function stateLabel(state, t, lesson) {
   if (state === 'completed') return t('Yakunlandi');
-  if (state === 'locked') return t('Oldingi dars testidan 60% oling');
+  if (state === 'locked') return t(lesson?.locked_reason || 'Oldingi dars testidan 60% oling');
   if (state === 'current') return t('Hozirgi dars');
   return t('Ochiq dars');
 }
@@ -163,7 +163,7 @@ export default function LearningRoadmap({ lessons, progress = {}, onOpenLesson }
                       '--roadmap-y': `${desktopPoint.y}px`,
                       '--roadmap-delay': `${Math.min(globalIndex, 12) * 55}ms`,
                     }}
-                    title={isLocked ? (lesson.locked_reason || 'Oldingi dars testidan kamida 60% oling') : undefined}
+                    title={isLocked ? t(lesson.locked_reason || 'Oldingi dars testidan kamida 60% oling') : undefined}
                   >
                     {state === 'current' && (
                       <span className="roadmap-current-flag">
@@ -176,7 +176,7 @@ export default function LearningRoadmap({ lessons, progress = {}, onOpenLesson }
                       className="roadmap-node"
                       disabled={isLocked}
                       onClick={() => !isLocked && onOpenLesson?.(lesson)}
-                      aria-label={`${globalIndex + 1}-${t('dars')}: ${formatLessonTitle(lesson.title)}. ${stateLabel(state, t)}`}
+                      aria-label={`${globalIndex + 1}-${t('dars')}: ${formatLessonTitle(lesson.title)}. ${stateLabel(state, t, lesson)}`}
                     >
                       <span className="roadmap-node-shine" aria-hidden="true" />
                       {state === 'completed' && <Check size={28} strokeWidth={3} />}
@@ -192,7 +192,7 @@ export default function LearningRoadmap({ lessons, progress = {}, onOpenLesson }
                         {state === 'current' && <Sparkles size={13} />}
                       </div>
                       <h3>{formatLessonTitle(lesson.title)}</h3>
-                      <p>{stateLabel(state, t)}</p>
+                      <p>{stateLabel(state, t, lesson)}</p>
                     </div>
                   </div>
                 );

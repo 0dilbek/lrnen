@@ -81,6 +81,25 @@ class Lesson(models.Model):
         ordering = ['order', 'created_at']
 
 
+class GroupLessonRelease(models.Model):
+    group = models.ForeignKey(
+        'accounts.StudentGroup', on_delete=models.CASCADE, related_name='lesson_releases',
+    )
+    level = models.ForeignKey(Level, on_delete=models.CASCADE, related_name='group_releases')
+    current_lesson = models.ForeignKey(
+        Lesson, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='released_for_groups',
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['group', 'level'], name='unique_group_level_release'),
+        ]
+
+    def __str__(self):
+        return f'{self.group} — {self.level}: {self.current_lesson}'
+
+
 class Vocabulary(models.Model):
     lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE, related_name='vocabulary')
     word = models.CharField(max_length=100)           # English

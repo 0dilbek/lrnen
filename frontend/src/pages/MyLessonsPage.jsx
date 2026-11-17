@@ -71,6 +71,7 @@ export default function MyLessonsPage() {
     (lesson) => progress[lesson.id]?.status !== 'completed' && !lesson.is_locked,
   );
   const currentLesson = currentLessonIndex >= 0 ? lessons[currentLessonIndex] : null;
+  const waitingForRelease = !currentLesson && lockedCount > 0;
 
   const jumpToCurrentLesson = () => {
     if (!currentLesson) return;
@@ -84,7 +85,7 @@ export default function MyLessonsPage() {
     <div className="mx-auto max-w-5xl px-3 py-7 sm:px-5 sm:py-9">
       <div className="mb-6">
         <h1 className="stu-title text-2xl font-black sm:text-3xl">{t('Darslarim')}</h1>
-        <p className="stu-muted mt-1">{t('Har bir dars testidan kamida 60% oling — keyingi dars avtomatik ochiladi')}</p>
+        <p className="stu-muted mt-1">{t('Keyingi dars uchun oldingi testdan 60% oling. Dars guruhingiz uchun ham ochilgan bo‘lishi kerak.')}</p>
       </div>
 
       {loadError ? (
@@ -99,16 +100,16 @@ export default function MyLessonsPage() {
             <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex min-w-0 items-center gap-4">
                 <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border border-white/15 bg-white/10 text-3xl backdrop-blur-sm" aria-hidden="true">
-                  {currentLesson ? motivation.emoji : '🏆'}
+                  {currentLesson ? motivation.emoji : waitingForRelease ? '🔒' : '🏆'}
                 </span>
                 <div className="min-w-0">
                   <p className="text-xs font-extrabold uppercase tracking-[.13em] text-indigo-200">
-                    {currentLesson ? `${t('Hozirgi dars')} · ${currentLessonIndex + 1}` : t('Barcha darslar yakunlandi')}
+                    {currentLesson ? `${t('Hozirgi dars')} · ${currentLessonIndex + 1}` : waitingForRelease ? t('Keyingi dars ochilishini kuting') : t('Barcha darslar yakunlandi')}
                   </p>
                   <h2 className="mt-1 truncate text-lg font-black sm:text-xl">
-                    {currentLesson ? formatLessonTitle(currentLesson.title) : 'Til cho‘qqisini zabt etdingiz!'}
+                    {currentLesson ? formatLessonTitle(currentLesson.title) : waitingForRelease ? t('Ochiq darslar yakunlandi') : 'Til cho‘qqisini zabt etdingiz!'}
                   </h2>
-                  <p className="mt-1 text-sm text-indigo-100">{t(motivation.msg)}</p>
+                  <p className="mt-1 text-sm text-indigo-100">{waitingForRelease ? t('Ochiq darslarni yakunladingiz. Administrator keyingi mavzuni ochganda davom etasiz.') : t(motivation.msg)}</p>
                 </div>
               </div>
 
