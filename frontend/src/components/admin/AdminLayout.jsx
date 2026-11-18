@@ -131,16 +131,25 @@ export default function AdminLayout({ children, title, subtitle }) {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className={`admin-header sticky top-0 z-40 shrink-0 border-b px-4 py-3 backdrop-blur-xl md:px-8 md:py-5 ${(title || subtitle) ? '' : 'md:hidden'}`}>
-          <div className="flex items-center gap-3">
+        <header className="admin-header sticky top-0 z-40 shrink-0 border-b px-3 py-3 backdrop-blur-xl sm:px-4 md:px-8 md:py-5">
+          <div className="flex items-center gap-2 sm:gap-3">
             <button type="button" onClick={() => setSidebarOpen(true)} className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-border admin-text-title hover:bg-surface-200 md:hidden" aria-label="Menyuni ochish">
               <Menu size={20} />
             </button>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <h1 className="truncate text-lg font-black admin-text-title md:text-xl">{t(title || 'Boshqaruv')}</h1>
               {subtitle && <p className="mt-0.5 hidden truncate text-sm admin-text-muted sm:block">{t(subtitle)}</p>}
             </div>
-            <Link to="/admin/notifications" className="relative ml-auto grid h-10 w-10 shrink-0 place-items-center rounded-xl admin-text-muted hover:bg-surface-200 md:hidden" aria-label="Notificationlar">
+            <Link
+              to="/admin/groups"
+              title={t('Guruhlar')}
+              aria-current={isActive(NAV.find((item) => item.to === '/admin/groups')) ? 'page' : undefined}
+              className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl border border-indigo-500/25 bg-indigo-500/10 px-2.5 text-xs font-bold text-indigo-700 transition hover:bg-indigo-500/20 dark:text-indigo-300 sm:gap-2 sm:px-3 sm:text-sm"
+            >
+              <UsersRound size={17} aria-hidden="true" />
+              {t('Guruhlar')}
+            </Link>
+            <Link to="/admin/notifications" className="relative hidden h-10 w-10 shrink-0 place-items-center rounded-xl admin-text-muted hover:bg-surface-200 sm:grid" aria-label={t('Notificationlar')}>
               <Bell size={18} />
               {notificationCount > 0 && (
                 <span className="absolute right-0.5 top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-red-500 px-1 text-[8px] font-black text-white">
@@ -148,13 +157,39 @@ export default function AdminLayout({ children, title, subtitle }) {
                 </span>
               )}
             </Link>
-            <div className="ml-auto md:hidden"><LanguageSwitcher compact /></div>
+            <div className="shrink-0 md:hidden"><LanguageSwitcher compact /></div>
             <button type="button" onClick={toggle} className="grid h-10 w-10 shrink-0 place-items-center rounded-xl admin-text-muted hover:bg-surface-200 md:hidden" aria-label={dark ? 'Kunduzgi rejim' : 'Tungi rejim'}>
               {dark ? <Sun size={18} /> : <Moon size={18} />}
             </button>
           </div>
         </header>
-        <main className="admin-main min-w-0 flex-1 overflow-x-hidden">{children}</main>
+        <main className="admin-main min-w-0 flex-1 overflow-x-hidden pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0">{children}</main>
+        <nav className="admin-header fixed inset-x-0 bottom-0 z-50 border-t backdrop-blur-xl md:hidden" aria-label={t('Admin navigatsiya')}>
+          <div className="mx-auto grid max-w-lg grid-cols-5 gap-0.5 px-1 pb-[max(.35rem,env(safe-area-inset-bottom))] pt-1">
+            {NAV.map((item) => {
+              const active = isActive(item);
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  aria-current={active ? 'page' : undefined}
+                  className={`relative flex min-w-0 flex-col items-center gap-0.5 rounded-xl px-0.5 py-1.5 transition ${active ? 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300' : 'admin-text-muted hover:bg-surface-200'}`}
+                >
+                  <span className="relative grid h-8 w-9 place-items-center">
+                    <Icon size={20} strokeWidth={active ? 2.5 : 2} aria-hidden="true" />
+                    {item.notification && notificationCount > 0 && (
+                      <span className="absolute -right-1 -top-0.5 rounded-full bg-red-500 px-1 text-[8px] font-black leading-4 text-white">
+                        {notificationCount > 9 ? '9+' : notificationCount}
+                      </span>
+                    )}
+                  </span>
+                  <span className="max-w-full truncate text-[9px] font-bold sm:text-[10px]">{t(item.label)}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
       </div>
     </div>
   );

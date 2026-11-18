@@ -44,6 +44,10 @@ function PublicRoute({ children }) {
 }
 
 function Layout({ children }) {
+  const { user } = useAuth();
+  if (user?.role === 'admin') {
+    return <AdminLayout>{children}</AdminLayout>;
+  }
   return (
     <div className="min-h-screen bg-surface">
       <Navbar />

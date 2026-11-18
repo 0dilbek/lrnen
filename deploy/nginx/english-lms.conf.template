@@ -65,7 +65,15 @@ server {
         add_header Cross-Origin-Resource-Policy "same-origin" always;
     }
 
+    # Revalidate the SPA document so every fresh login loads the latest menu.
+    # Using expires preserves the security headers inherited from the server.
+    location = /index.html {
+        expires -1;
+        try_files $uri =404;
+    }
+
     location / {
+        expires -1;
         try_files $uri $uri/ /index.html;
     }
 }
