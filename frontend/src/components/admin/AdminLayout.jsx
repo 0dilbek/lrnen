@@ -164,7 +164,7 @@ export default function AdminLayout({ children, title, subtitle }) {
           </div>
         </header>
         <main className="admin-main min-w-0 flex-1 overflow-x-hidden pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0">{children}</main>
-        <nav className="admin-header fixed inset-x-0 bottom-0 z-50 border-t backdrop-blur-xl md:hidden" aria-label={t('Admin navigatsiya')}>
+        <nav className="admin-header fixed inset-x-0 bottom-0 z-40 border-t backdrop-blur-xl md:hidden" aria-label={t('Admin navigatsiya')}>
           <div className="mx-auto grid max-w-lg grid-cols-5 gap-0.5 px-1 pb-[max(.35rem,env(safe-area-inset-bottom))] pt-1">
             {NAV.map((item) => {
               const active = isActive(item);
