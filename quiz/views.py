@@ -402,25 +402,29 @@ class ExerciseAssetLibraryView(APIView):
         if kind == 'book':
             return Response(self._book_pages(query))
         if kind == 'audio':
-            return Response(self._audio_files(query, request.query_params.get('unit')))
+            return Response(self._audio_files(
+                query, request.query_params.get('unit'),
+                request.query_params.get('level'), request.query_params.get('book'),
+            ))
         return Response({'detail': 'kind must be book or audio'}, status=400)
 
     @staticmethod
     def _book_pages(query):
         rows = []
-        for folder in ('book', 'book2', 'book3'):
+        for folder in ('book', 'book2', 'book3', 'coursebooks'):
             book_dir = Path(settings.BASE_DIR) / 'static' / folder
-            for path in sorted(book_dir.glob('*.jpg')):
+            for path in sorted(book_dir.rglob('*.jpg')):
                 match = re.search(r'page-(\d+)\.jpg$', path.name, re.IGNORECASE)
                 if not match:
                     continue
                 page_number = int(match.group(1))
                 if query and query not in str(page_number) and query not in path.name.lower():
                     continue
-                raw_url = f'/static/{folder}/{path.name}'
+                relative = path.relative_to(book_dir)
+                raw_url = f'/static/{folder}/{relative.as_posix()}'
                 rows.append({
                     'name': path.name,
-                    'book': folder,
+                    'book': '/'.join((folder, *relative.parts[:-1])),
                     'page_number': page_number,
                     'url': raw_url,
                     'preview_url': protected_media_url(raw_url),
@@ -428,10 +432,17 @@ class ExerciseAssetLibraryView(APIView):
         return {'kind': 'book', 'count': len(rows), 'results': rows}
 
     @staticmethod
-    def _audio_files(query, unit):
+    def _audio_files(query, unit, level=None, book=None):
         audio_dir = Path(settings.BASE_DIR) / 'static' / 'audio'
         unit_value = str(unit or '').strip()
-        search_root = audio_dir / unit_value if unit_value and unit_value.isdigit() else audio_dir
+        if level or book:
+            if str(level) not in {'1', '2'} or book not in {'course', 'practice'}:
+                return {'kind': 'audio', 'count': 0, 'results': []}
+            search_root = audio_dir / 'books' / f'level{level}' / book
+            if unit_value and unit_value.isdigit():
+                search_root = search_root / unit_value
+        else:
+            search_root = audio_dir / unit_value if unit_value and unit_value.isdigit() else audio_dir
         if not search_root.exists():
             return {'kind': 'audio', 'count': 0, 'results': []}
 
@@ -445,7 +456,9 @@ class ExerciseAssetLibraryView(APIView):
             rows.append({
                 'name': path.name,
                 'track': path.stem.replace('_', '.'),
-                'unit': relative.parts[0] if len(relative.parts) > 1 else '',
+                'unit': path.parent.name,
+                'level': int(relative.parts[1][-1]) if relative.parts[0] == 'books' and len(relative.parts) >= 4 else 1,
+                'book': relative.parts[2] if relative.parts[0] == 'books' and len(relative.parts) >= 4 else 'practice',
                 'url': raw_url,
                 'preview_url': protected_media_url(raw_url),
             })
@@ -465,9 +478,11 @@ def _choose_correct_sentences(content):
     """
     if content.get('sentences'):
         return content['sentences']
+    if content.get('questions'):
+        return content['questions']
     if content.get('items'):
         return [
-            {'options': item.get('options', []), 'correct': item.get('correct_index', item.get('correct', 0))}
+            {**item, 'options': item.get('options', []), 'correct': item.get('correct_index', item.get('correct', 0))}
             for item in content['items']
         ]
     return []
@@ -497,6 +512,7 @@ def _listening_questions(content):
     if content.get('items'):
         return [
             {
+                **item,
                 'question': item.get('question', item.get('sentence', '')),
                 'options': item.get('options', []),
                 'correct': item.get('correct_index', item.get('correct', 0)),
@@ -504,6 +520,18 @@ def _listening_questions(content):
             for item in content['items']
         ]
     return []
+
+
+def _choice_answer_matches(question, given):
+    multiple = question.get('correct_indices')
+    if multiple is not None:
+        return (
+            isinstance(given, list)
+            and all(type(value) is int for value in given)
+            and len(given) == len(set(given))
+            and set(given) == set(multiple)
+        )
+    return type(given) is int and given == question.get('correct', question.get('correct_index', 0))
 
 
 def _scorable_rows(rows, content=None):
@@ -561,7 +589,7 @@ def _grade_exercise(exercise, user_answer):
             return False, 0
         correct_count = sum(
             1 for i, s in enumerate(sentences)
-            if i < len(user_answers) and user_answers[i] == s.get('correct', s.get('correct_index'))
+            if i < len(user_answers) and _choice_answer_matches(s, user_answers[i])
         )
         score = round((correct_count / len(sentences)) * 100)
         return score == 100, score
@@ -629,11 +657,11 @@ def _grade_exercise(exercise, user_answer):
         correct_count = sum(
             1 for i, q in enumerate(questions)
             if (
-                (isinstance(user_answers, list) and i < len(user_answers) and user_answers[i] == q.get('correct', q.get('correct_index', 0)))
+                (isinstance(user_answers, list) and i < len(user_answers) and _choice_answer_matches(q, user_answers[i]))
                 or (
                     isinstance(user_answers, dict)
                     and str(i) in user_answers
-                    and user_answers[str(i)] == q.get('correct', q.get('correct_index', 0))
+                    and _choice_answer_matches(q, user_answers[str(i)])
                 )
             )
         )
@@ -662,7 +690,7 @@ def _build_feedback(exercise, user_answer, is_correct):
     if etype == 'choose_correct':
         sentences = _choose_correct_sentences(content)
         return {
-            'correct_indices': [s.get('correct', s.get('correct_index', 0)) for s in sentences],
+            'correct_indices': [s.get('correct_indices', s.get('correct', s.get('correct_index', 0))) for s in sentences],
         }
 
     if etype == 'fill_blank' or (etype in ('reading', 'listening') and content.get('sentences')):
@@ -684,7 +712,7 @@ def _build_feedback(exercise, user_answer, is_correct):
     if etype in ('listening', 'reading'):
         questions = _scorable_rows(_listening_questions(content), content)
         return {
-            'correct_indices': [q.get('correct', q.get('correct_index', 0)) for q in questions],
+            'correct_indices': [q.get('correct_indices', q.get('correct', q.get('correct_index', 0))) for q in questions],
         }
 
     if etype == 'word_order':

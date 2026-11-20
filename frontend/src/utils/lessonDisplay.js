@@ -8,7 +8,7 @@ export function formatLessonTitle(title = '') {
 
 export function formatLessonDescription(desc = '') {
   if (!desc) return '';
-  if (/DK English|Level \d/i.test(desc)) return '';
+  if (/DK English|Level \d/i.test(desc) && !desc.includes('\n')) return '';
   return desc;
 }
 

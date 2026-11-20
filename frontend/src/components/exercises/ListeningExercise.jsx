@@ -5,6 +5,10 @@ import FillBlankExercise from './FillBlankExercise';
 import MatchingExercise from './MatchingExercise';
 import BookPageViewer from './BookPageViewer';
 import { ProtectedMedia } from '../../context/MediaProtectionContext';
+import { useLanguage } from '../../context/LanguageContext';
+import {
+  answerMatches, correctIndices, exampleCountFor, isMultipleChoice, shuffledIndices,
+} from '../../utils/exerciseChoices';
 
 /**
  * Listening exercise
@@ -13,8 +17,10 @@ import { ProtectedMedia } from '../../context/MediaProtectionContext';
  * exercise.content    — { questions } | { sentences } | { left, right, pairs }
  */
 export default function ListeningExercise({ exercise, onComplete }) {
+  const { t } = useLanguage();
   const { audio_url, content } = exercise;
   const questions = useMemo(() => content?.questions || content?.items?.map((item) => ({
+    ...item,
     question: item.question || item.sentence || '',
     options: item.options || [],
     correct: item.correct_index ?? item.correct ?? 0,
@@ -26,16 +32,17 @@ export default function ListeningExercise({ exercise, onComplete }) {
 
   const audioRef = useRef(null);
   const [playing, setPlaying] = useState(false);
-  const exampleCount = Number.isInteger(content?.example_count)
-    ? content.example_count
-    : (questions.length >= 2 ? 1 : 0);
+  const exampleCount = exampleCountFor(content, questions.length);
   const hasExample = exampleCount > 0;
   const exampleAnswers = useMemo(
-    () => (hasExample ? { 0: questions[0].correct } : {}),
-    [hasExample, questions]
+    () => Object.fromEntries(questions.slice(0, exampleCount).map((row, index) => [
+      index, isMultipleChoice(row) ? correctIndices(row) : correctIndices(row)[0],
+    ])),
+    [exampleCount, questions]
   );
   const [answers, setAnswers] = useState(() => ({ ...exampleAnswers }));
   const [submitted, setSubmitted] = useState(false);
+  const [optionOrders, setOptionOrders] = useState(() => questions.map((row) => shuffledIndices(row.options || [])));
   const [modalImage, setModalImage] = useState(null);
   const [zoom, setZoom] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -67,17 +74,24 @@ export default function ListeningExercise({ exercise, onComplete }) {
   /* ── answers ── */
   const choose = (qi, idx) => {
     if (submitted || qi < exampleCount) return;
-    setAnswers((a) => ({ ...a, [qi]: idx }));
+    setAnswers((a) => {
+      if (!isMultipleChoice(questions[qi])) return { ...a, [qi]: idx };
+      const previous = Array.isArray(a[qi]) ? a[qi] : [];
+      return { ...a, [qi]: previous.includes(idx) ? previous.filter((value) => value !== idx) : [...previous, idx] };
+    });
   };
 
   const scorable = questions.slice(exampleCount);
 
   const handleSubmit = () => {
     if (scorable.length === 0) return;
-    const allDone = scorable.every((_, i) => answers[i + exampleCount] !== undefined);
+    const allDone = scorable.every((_, i) => {
+      const answer = answers[i + exampleCount];
+      return Array.isArray(answer) ? answer.length > 0 : answer !== undefined;
+    });
     if (!allDone) return;
     setSubmitted(true);
-    const correct = scorable.filter((q, i) => answers[i + exampleCount] === q.correct).length;
+    const correct = scorable.filter((q, i) => answerMatches(q, answers[i + exampleCount])).length;
     onComplete?.(correct, scorable.length, {
       answers: Object.fromEntries(scorable.map((_, i) => [String(i), answers[i + exampleCount]])),
     });
@@ -85,6 +99,7 @@ export default function ListeningExercise({ exercise, onComplete }) {
 
   const reset = () => {
     setAnswers({ ...exampleAnswers });
+    setOptionOrders(questions.map((row) => shuffledIndices(row.options || [])));
     setSubmitted(false);
   };
 
@@ -99,7 +114,7 @@ export default function ListeningExercise({ exercise, onComplete }) {
   return (
     <div className="space-y-4">
       {Array.isArray(content?.pages) && content.pages.length > 0 && (
-        <BookPageViewer pages={content.pages} title="Listening sahifalari" />
+        <BookPageViewer pages={content.pages} title={t('Listening sahifalari')} />
       )}
       {/* ── Topshiriq rasmlari ── */}
       {content?.image_url && (
@@ -265,7 +280,7 @@ export default function ListeningExercise({ exercise, onComplete }) {
       {/* sentences → fill blank (namuna 1-savolda) */}
       {hasSentenceContent && (
         <FillBlankExercise
-          exercise={{ ...exercise, content: { sentences: content.sentences, word_panel: content.word_panel } }}
+          exercise={{ ...exercise, content: { sentences: content.sentences, word_panel: content.word_panel, example_count: content.example_count } }}
           onComplete={onComplete}
         />
       )}
@@ -280,12 +295,15 @@ export default function ListeningExercise({ exercise, onComplete }) {
         <div className="space-y-3">
           {hasExample && (
             <p className="text-xs stu-muted italic">
-              1-savol namuna — shunday yechiladi. Siz 2-savoldan boshlang.
+              {t('Belgilangani namuna. Qolgan savollarga javob bering.')}
             </p>
           )}
           <p className="text-xs font-semibold stu-muted uppercase tracking-wide">Savollar</p>
           {questions.map((q, qi) => {
             const isExample = qi < exampleCount;
+            const multiple = isMultipleChoice(q);
+            const correct = correctIndices(q);
+            const selected = Array.isArray(answers[qi]) ? answers[qi] : [answers[qi]];
             return (
               <div
                 key={qi}
@@ -309,12 +327,14 @@ export default function ListeningExercise({ exercise, onComplete }) {
                     onContextMenu={(event) => event.preventDefault()}
                   />
                 )}
-                <div className="space-y-1.5">
-                  {q.options.map((opt, oi) => {
-                    const chosen = answers[qi] === oi;
+                {multiple && <p className="mb-2 text-xs font-semibold stu-muted">{t('Barcha to‘g‘ri javoblarni belgilang.')}</p>}
+                <div className="space-y-1.5" role="group" aria-label={t('Javob variantlari')}>
+                  {(optionOrders[qi] || []).map((oi) => {
+                    const opt = q.options[oi];
+                    const chosen = selected.includes(oi);
                     let cls = 'border-border bg-surface-50 stu-body hover:border-teal-400 hover:bg-teal-500/10';
                     if (submitted || isExample) {
-                      if (oi === q.correct) cls = 'border-green-500 bg-green-500/10 text-green-700 dark:text-green-300 font-semibold';
+                      if (correct.includes(oi)) cls = 'border-green-500 bg-green-500/10 text-green-700 dark:text-green-300 font-semibold';
                       else if (chosen && !isExample) cls = 'border-red-500 bg-red-500/10 text-red-700 dark:text-red-300 line-through';
                       else cls = 'border-border bg-surface-200 stu-muted';
                     } else if (chosen) {
@@ -323,11 +343,15 @@ export default function ListeningExercise({ exercise, onComplete }) {
                     return (
                       <button
                         key={oi}
+                        type="button"
+                        role={multiple ? 'checkbox' : undefined}
+                        aria-checked={multiple ? chosen : undefined}
+                        aria-pressed={multiple ? undefined : chosen}
                         onClick={() => choose(qi, oi)}
                         disabled={submitted || isExample}
                         className={`w-full text-left px-3 py-2 rounded-lg border text-sm transition ${cls} disabled:cursor-default`}
                       >
-                        {opt}
+                        {multiple && <span aria-hidden="true" className="mr-2 font-bold">{chosen ? '☑' : '☐'}</span>}{opt}
                       </button>
                     );
                   })}
@@ -339,7 +363,10 @@ export default function ListeningExercise({ exercise, onComplete }) {
           {!submitted ? (
             <button
               onClick={handleSubmit}
-              disabled={scorable.some((_, i) => answers[i + exampleCount] === undefined)}
+              disabled={scorable.length === 0 || scorable.some((_, i) => {
+                const answer = answers[i + exampleCount];
+                return Array.isArray(answer) ? answer.length === 0 : answer === undefined;
+              })}
               className="w-full py-2.5 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white font-semibold rounded-xl transition text-sm"
             >
               Tekshirish
@@ -347,11 +374,11 @@ export default function ListeningExercise({ exercise, onComplete }) {
           ) : (
             <div className="flex items-center gap-3">
               <div className={`flex-1 text-center py-2 rounded-xl text-sm font-semibold ${
-                scorable.filter((q, i) => answers[i + exampleCount] === q.correct).length === scorable.length
+                scorable.filter((q, i) => answerMatches(q, answers[i + exampleCount])).length === scorable.length
                   ? 'bg-green-500/10 text-green-700 dark:text-green-300'
                   : 'bg-orange-500/10 text-orange-700 dark:text-orange-300'
               }`}>
-                {scorable.filter((q, i) => answers[i + exampleCount] === q.correct).length} / {scorable.length} to'g'ri
+                {scorable.filter((q, i) => answerMatches(q, answers[i + exampleCount])).length} / {scorable.length} {t('to‘g‘ri')}
               </div>
               <button
                 onClick={reset}

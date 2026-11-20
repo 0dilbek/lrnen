@@ -1,204 +1,132 @@
 import { useState, useMemo } from 'react';
-import { CheckCircle2, XCircle, ChevronRight, RotateCcw } from 'lucide-react';
+import { Check, CheckCircle2, XCircle, ChevronRight, RotateCcw } from 'lucide-react';
 import ExampleBadge from './ExampleBadge';
+import { useLanguage } from '../../context/LanguageContext';
+import {
+  answerMatches, correctIndices, exampleCountFor, isMultipleChoice, shuffledIndices,
+} from '../../utils/exerciseChoices';
 
-/**
- * content: {
- *   sentences: [
- *     { before: "Jack ", options: ["are","is"], after: " 27 years old.", correct: 1 }
- *   ]
- * }
- */
 function normalizeItems(content) {
-  if (content?.sentences) return content.sentences;
-  if (content?.items) {
-    return content.items.map((item) => {
-      const opts = item.options || [];
-      const sentence = item.sentence || '';
-      const combo = opts.join(' / ');
-      const idx = sentence.indexOf(combo);
-      if (idx !== -1) {
-        return {
-          before: sentence.substring(0, idx),
-          options: opts,
-          after: sentence.substring(idx + combo.length),
-          correct: item.correct_index ?? 0,
-        };
-      }
-      return { before: sentence, options: opts, after: '', correct: item.correct_index ?? 0 };
-    });
-  }
-  if (content?.questions) {
-    return content.questions.map((q) => ({
-      before: q.question,
-      options: q.options,
-      after: '',
-      correct: q.correct,
-    }));
-  }
-  return [];
+  const rows = content?.sentences || content?.items || content?.questions || [];
+  return rows.map((row) => {
+    if (row.before !== undefined || row.after !== undefined) return row;
+    const sentence = row.question || row.sentence || row.text || '';
+    const options = row.options || [];
+    const combo = options.join(' / ');
+    const position = combo ? sentence.indexOf(combo) : -1;
+    return {
+      ...row,
+      before: position < 0 ? sentence : sentence.slice(0, position),
+      options,
+      after: position < 0 ? '' : sentence.slice(position + combo.length),
+    };
+  });
 }
 
 export default function ChooseCorrectExercise({ exercise, onComplete }) {
-  const sentences = normalizeItems(exercise.content);
-  const exampleCount = Number.isInteger(exercise.content?.example_count)
-    ? exercise.content.example_count
-    : (sentences.length >= 2 ? 1 : 0);
-  const hasExample = exampleCount > 0;
-  const exampleAnswer = useMemo(
-    () => (hasExample ? { 0: sentences[0].correct } : {}),
-    [hasExample, sentences]
-  );
-
-  const [answers, setAnswers] = useState(() => ({ ...exampleAnswer }));
+  const { t } = useLanguage();
+  const sentences = useMemo(() => normalizeItems(exercise.content), [exercise.content]);
+  const exampleCount = exampleCountFor(exercise.content, sentences.length);
+  const exampleAnswers = useMemo(() => Object.fromEntries(
+    sentences.slice(0, exampleCount).map((row, index) => [
+      index, isMultipleChoice(row) ? correctIndices(row) : correctIndices(row)[0],
+    ]),
+  ), [sentences, exampleCount]);
+  const [answers, setAnswers] = useState(() => ({ ...exampleAnswers }));
   const [checked, setChecked] = useState(false);
+  const [optionOrders, setOptionOrders] = useState(() => sentences.map((row) => shuffledIndices(row.options || [])));
+  const audioUrls = exercise.content?.audio_urls || [];
 
-  const select = (idx, optIdx) => {
-    if (checked || idx < exampleCount) return;
-    setAnswers((a) => ({ ...a, [idx]: optIdx }));
-  };
-
-  const scorable = sentences.slice(exampleCount);
-  const allAnswered = scorable.every((_, i) => {
-    const idx = i + exampleCount;
-    return answers[idx] !== undefined;
-  });
-
-  const handleCheck = () => {
-    setChecked(true);
-    const correct = scorable.filter((s, i) => {
-      const idx = i + exampleCount;
-      return answers[idx] === s.correct;
-    }).length;
-    if (onComplete) onComplete(correct, scorable.length, {
-      answers: scorable.map((_, i) => answers[i + exampleCount]),
+  const select = (rowIndex, originalIndex) => {
+    if (checked || rowIndex < exampleCount) return;
+    setAnswers((current) => {
+      if (!isMultipleChoice(sentences[rowIndex])) return { ...current, [rowIndex]: originalIndex };
+      const previous = Array.isArray(current[rowIndex]) ? current[rowIndex] : [];
+      return {
+        ...current,
+        [rowIndex]: previous.includes(originalIndex)
+          ? previous.filter((index) => index !== originalIndex)
+          : [...previous, originalIndex],
+      };
     });
   };
 
-  const handleRetry = () => {
-    setAnswers({ ...exampleAnswer });
+  const scorable = sentences.slice(exampleCount);
+  const allAnswered = scorable.length > 0 && scorable.every((_, index) => {
+    const answer = answers[index + exampleCount];
+    return Array.isArray(answer) ? answer.length > 0 : answer !== undefined;
+  });
+  const score = scorable.filter((row, index) => answerMatches(row, answers[index + exampleCount])).length;
+
+  const handleCheck = () => {
+    if (!allAnswered) return;
+    setChecked(true);
+    onComplete?.(score, scorable.length, {
+      // Always submit source indices, never shuffled display positions.
+      answers: scorable.map((_, index) => answers[index + exampleCount]),
+    });
+  };
+
+  const retry = () => {
+    setAnswers({ ...exampleAnswers });
+    setOptionOrders(sentences.map((row) => shuffledIndices(row.options || [])));
     setChecked(false);
   };
 
-  const score = checked
-    ? scorable.filter((s, i) => {
-      const idx = i + exampleCount;
-        return answers[idx] === s.correct;
-      }).length
-    : null;
-
   return (
-    <div className="max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
-      {hasExample && (
-        <p className="text-xs stu-muted mb-4 italic">
-          1-savol namuna — shunday yechiladi. Siz 2-savoldan boshlang.
-        </p>
-      )}
-      <div className="space-y-4 mb-8">
-        {sentences.map((s, i) => {
-          const isExample = i < exampleCount;
-          const chosen = answers[i];
-          const isCorrect = checked && chosen === s.correct;
-          const isWrong = checked && !isExample && chosen !== s.correct && chosen !== undefined;
-
-          return (
-            <div
-              key={i}
-              className={`group relative overflow-hidden p-5 rounded-2xl border transition-all duration-300 ${
-                isExample
-                  ? 'bg-amber-500/5 border-amber-500/30'
-                  : isCorrect
-                    ? 'bg-emerald-500/10 border-emerald-500/35 shadow-sm'
-                    : isWrong
-                      ? 'bg-rose-500/10 border-rose-500/35 shadow-sm'
-                      : chosen !== undefined
-                        ? 'bg-indigo-500/10 border-indigo-500/30 shadow-sm'
-                        : 'bg-surface-100 border-border hover:border-indigo-300 hover:shadow-md'
-              }`}
-            >
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="mr-1 flex h-6 w-6 items-center justify-center rounded-full bg-surface-200 text-[10px] font-bold stu-muted">
-                  {i + 1}
-                </span>
-                {isExample && <ExampleBadge />}
-
-                {s.before && <span className="stu-body font-medium leading-relaxed">{s.before}</span>}
-
-                <div className="inline-flex items-center gap-1.5 p-1 bg-surface-200/60 rounded-xl border border-border shadow-inner">
-                  {s.options.map((opt, oi) => {
-                    const isSelected = chosen === oi;
-                    const isTheCorrectOne = (checked || isExample) && oi === s.correct;
-                    const isTheWrongOne = checked && !isExample && isSelected && oi !== s.correct;
-
-                    return (
-                      <button
-                        key={oi}
-                        onClick={() => select(i, oi)}
-                        disabled={isExample || checked}
-                        className={`px-4 py-1.5 rounded-lg font-semibold text-xs transition-all duration-300 transform active:scale-95 ${
-                          isTheCorrectOne
-                            ? 'bg-emerald-500 text-white shadow-lg scale-105 z-10'
-                            : isTheWrongOne
-                              ? 'bg-rose-500 text-white shadow-lg'
-                              : isSelected
-                                ? 'bg-indigo-600 text-white shadow-md'
-                                : checked
-                                  ? 'bg-surface-100 stu-muted cursor-default'
-                                  : 'bg-surface-50 stu-body hover:text-indigo-600 hover:shadow-sm'
-                        } ${isExample ? 'cursor-default' : ''}`}
-                      >
-                        {opt}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {s.after && <span className="stu-body font-medium leading-relaxed">{s.after}</span>}
-
-                {(checked || isExample) && (
-                  <div className="ml-auto">
-                    {isExample || isCorrect
-                      ? <CheckCircle2 size={20} className="text-emerald-500" />
-                      : isWrong
-                        ? <XCircle size={20} className="text-rose-500" />
-                        : null}
-                  </div>
-                )}
-              </div>
+    <div className="mx-auto max-w-3xl space-y-5">
+      {exampleCount > 0 && <p className="text-xs italic stu-muted">{t('Belgilangani namuna. Qolgan savollarga javob bering.')}</p>}
+      {sentences.map((row, rowIndex) => {
+        const isExample = rowIndex < exampleCount;
+        const multiple = isMultipleChoice(row);
+        const selected = Array.isArray(answers[rowIndex]) ? answers[rowIndex] : [answers[rowIndex]];
+        const rowCorrect = answerMatches(row, answers[rowIndex]);
+        const correct = correctIndices(row);
+        const audioUrl = audioUrls[rowIndex] || row.audio_url;
+        return (
+          <div key={rowIndex} className={`rounded-2xl border p-4 sm:p-5 ${isExample ? 'border-amber-500/30 bg-amber-500/5' : checked ? rowCorrect ? 'border-emerald-500/35 bg-emerald-500/10' : 'border-rose-500/35 bg-rose-500/10' : 'border-border bg-surface-100'}`}>
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <span className="grid h-6 w-6 place-items-center rounded-full bg-surface-200 text-xs font-bold stu-muted">{rowIndex + 1}</span>
+              {isExample && <ExampleBadge />}
+              {row.before && <span className="whitespace-pre-line font-medium stu-body">{row.before}</span>}
+              {(isExample || checked) && (rowCorrect ? <CheckCircle2 size={18} className="ml-auto text-emerald-500" /> : <XCircle size={18} className="ml-auto text-rose-500" />)}
             </div>
-          );
-        })}
-      </div>
-
-      <div className="flex justify-center border-t border-border pt-8">
-        {!checked ? (
-          <button
-            onClick={handleCheck}
-            disabled={!allAnswered || scorable.length === 0}
-            className="group flex items-center gap-2 px-8 py-3.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-2xl font-bold transition-all shadow-lg"
-          >
-            Tekshirish
-            <ChevronRight size={18} className="group-hover:translate-x-0.5 transition-transform" />
-          </button>
-        ) : (
-          <div className="flex flex-col items-center gap-5 w-full">
-            <div className="flex items-center gap-3 px-6 py-3 student-card">
-              <div className={`text-2xl font-black ${score === scorable.length ? 'text-emerald-500' : 'text-amber-500'}`}>
-                {score} / {scorable.length}
-              </div>
-              <div className="h-8 w-px bg-border mx-2" />
-              <div className="text-sm stu-muted font-medium italic">
-                {score === scorable.length ? 'Ajoyib natija!' : "Yana urinib ko'ring"}
-              </div>
+            {audioUrl && <audio src={audioUrl} controls controlsList="nodownload noremoteplayback" preload="metadata" disableRemotePlayback className="mb-3 h-9 w-full" />}
+            {multiple && <p className="mb-2 text-xs font-semibold stu-muted">{t('Barcha to‘g‘ri javoblarni belgilang.')}</p>}
+            <div className="flex flex-wrap gap-2" role="group" aria-label={t('Javob variantlari')}>
+              {(optionOrders[rowIndex] || []).map((originalIndex) => {
+                const chosen = selected.includes(originalIndex);
+                const revealCorrect = (isExample || checked) && correct.includes(originalIndex);
+                const revealWrong = checked && chosen && !correct.includes(originalIndex);
+                return (
+                  <button
+                    key={originalIndex}
+                    type="button"
+                    role={multiple ? 'checkbox' : undefined}
+                    aria-checked={multiple ? chosen : undefined}
+                    aria-pressed={multiple ? undefined : chosen}
+                    disabled={isExample || checked}
+                    onClick={() => select(rowIndex, originalIndex)}
+                    className={`flex min-h-11 max-w-full items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm font-semibold transition ${revealCorrect ? 'border-emerald-500 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' : revealWrong ? 'border-rose-500 bg-rose-500/15 text-rose-700 dark:text-rose-300' : chosen ? 'border-indigo-500 bg-indigo-500/15 text-indigo-700 dark:text-indigo-300' : 'border-border bg-surface-50 stu-body hover:border-indigo-400'} disabled:cursor-default`}
+                  >
+                    {multiple && <span className={`grid h-4 w-4 shrink-0 place-items-center rounded border ${chosen ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-current'}`}>{chosen && <Check size={12} />}</span>}
+                    <span className="break-words">{row.options[originalIndex]}</span>
+                  </button>
+                );
+              })}
             </div>
-            <button
-              onClick={handleRetry}
-              className="flex items-center gap-2 px-6 py-2.5 bg-surface-200 hover:bg-surface-100 border border-border stu-body hover:text-indigo-600 rounded-xl text-xs font-bold transition-all"
-            >
-              <RotateCcw size={14} />
-              Qayta urinish
-            </button>
+            {row.after && <p className="mt-3 font-medium stu-body">{row.after}</p>}
           </div>
+        );
+      })}
+      <div className="flex flex-wrap items-center justify-center gap-4 border-t border-border pt-5">
+        {!checked ? (
+          <button type="button" onClick={handleCheck} disabled={!allAnswered} className="admin-btn-primary px-7 py-3 disabled:opacity-40">{t('Tekshirish')} <ChevronRight size={17} /></button>
+        ) : (
+          <>
+            <p className={`text-xl font-black ${score === scorable.length ? 'text-emerald-500' : 'text-amber-500'}`}>{score} / {scorable.length}</p>
+            <button type="button" onClick={retry} className="flex items-center gap-2 rounded-xl border border-border bg-surface-200 px-5 py-3 text-sm font-bold stu-body"><RotateCcw size={15} /> {t('Qayta urinish')}</button>
+          </>
         )}
       </div>
     </div>

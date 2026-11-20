@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { CheckCircle2, XCircle, RotateCcw, Check, Sparkles } from 'lucide-react';
 import ExampleBadge from './ExampleBadge';
+import { shuffledIndices } from '../../utils/exerciseChoices';
 
 function normalizeMatching(content) {
   if (content?.left && content?.right) return content;
@@ -36,14 +37,8 @@ export default function MatchingExercise({ exercise, onComplete }) {
 
   const exampleMatches = hasExample ? { 0: pairs[0] } : {};
 
-  const shuffledRight = (() => {
-    const indexed = right.map((text, i) => ({ text, origIdx: i }));
-    // Stable shuffle: re-renders do not move answers while the student is matching.
-    return indexed.sort((a, b) => {
-      const score = (item) => [...String(item.text)].reduce((sum, char) => sum + char.charCodeAt(0), item.origIdx * 97) % 101;
-      return score(a) - score(b);
-    });
-  })();
+  const [rightOrder, setRightOrder] = useState(() => shuffledIndices(right));
+  const shuffledRight = rightOrder.map((origIdx) => ({ text: right[origIdx], origIdx }));
 
   const [selected, setSelected] = useState(null);
   const [matches, setMatches] = useState(() => ({ ...exampleMatches }));
@@ -103,6 +98,7 @@ export default function MatchingExercise({ exercise, onComplete }) {
 
   const handleRetry = () => {
     setMatches({ ...exampleMatches });
+    setRightOrder(shuffledIndices(right));
     setSelected(null);
     setChecked(false);
   };

@@ -5,6 +5,12 @@ const LanguageContext = createContext(null);
 const STORAGE_KEY = 'interface_language';
 
 const KAA = {
+  'Topshiriq manbasi': 'Tapsırma deregi',
+  'Listening sahifalari': 'Tıńlaw betleri',
+  'Belgilangani namuna. Qolgan savollarga javob bering.': 'Belgilengeni úlgi. Qalǵan sorawlarǵa juwap beriń.',
+  'Barcha to‘g‘ri javoblarni belgilang.': 'Barlıq durıs juwaplardı belgileń.',
+  'Javob variantlari': 'Juwap variantları',
+  'to‘g‘ri': 'durıs',
   'Guruhlar': 'Toparlar',
   'Keyingi dars ochilishini kuting': 'Keyingi sabaqtıń ashılıwın kútiń',
   'Ochiq darslar yakunlandi': 'Ashıq sabaqlar juwmaqlandı',

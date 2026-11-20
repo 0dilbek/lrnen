@@ -9,6 +9,7 @@ import {
   MessageCircle,
   XCircle,
 } from 'lucide-react';
+import { answerMatches, exampleCountFor } from '../../utils/exerciseChoices';
 
 const TYPE_ICONS = {
   choose_correct: FileQuestion,
@@ -17,6 +18,8 @@ const TYPE_ICONS = {
   listening: Headphones,
   reading: FileQuestion,
   speaking: MessageCircle,
+  word_order: Keyboard,
+  written_answer: FileQuestion,
 };
 
 function formatDate(value) {
@@ -30,50 +33,72 @@ function formatDate(value) {
   }).format(new Date(value));
 }
 
-function scorableRows(rows) {
-  return rows.length >= 2 ? rows.slice(1) : rows;
+function scorableRows(rows, content) {
+  return rows.slice(exampleCountFor(content, rows.length));
 }
 
-function feedbackRows(values, sourceRows) {
+function feedbackRows(values, sourceRows, content) {
   if (!Array.isArray(values)) return [];
-  return sourceRows.length >= 2 && values.length === sourceRows.length ? values.slice(1) : values;
+  // Older feedback includes solved examples; newer feedback may be scorable-only.
+  return values.length === sourceRows.length
+    ? values.slice(exampleCountFor(content, sourceRows.length))
+    : values;
 }
 
 function stringifyValue(value) {
   if (value === null || value === undefined || value === '') return 'Javob berilmagan';
+  if (Array.isArray(value)) return value.length ? value.map(stringifyValue).join(' · ') : 'Javob berilmagan';
   if (typeof value === 'string' || typeof value === 'number') return String(value);
   return JSON.stringify(value, null, 2);
 }
 
-function buildAnswerRows(attempt) {
+function normalizeWritten(value) {
+  return String(value ?? '').replace(/[‘’]/g, "'").trim().toLowerCase().replace(/\s+/g, ' ').replace(/[.!?]+$/, '');
+}
+
+function writtenMatches(row, selected, correct) {
+  if (Array.isArray(correct)) {
+    return Array.isArray(selected) && selected.length === correct.length
+      && correct.every((value, index) => normalizeWritten(value) === normalizeWritten(selected[index]));
+  }
+  const given = normalizeWritten(selected);
+  return !!given && [correct, ...(row.alternatives || [])].map(normalizeWritten).includes(given);
+}
+
+export function buildAnswerRows(attempt) {
   const content = attempt.content_snapshot || {};
   const answer = attempt.user_answer || {};
   const feedback = attempt.feedback || {};
   const type = attempt.exercise_type;
 
-  if (type === 'choose_correct') {
-    const source = content.sentences || content.items || [];
-    const rows = scorableRows(source);
-    const answers = Array.isArray(answer.answers) ? answer.answers : [];
-    const correctValues = feedbackRows(feedback.correct_indices, source);
-    return rows.map((row, index) => {
-      const options = row.options || [];
-      const selectedIndex = answers[index];
-      const correctIndex = correctValues[index] ?? row.correct ?? row.correct_index;
+  if (type === 'matching' || (type === 'listening' && Array.isArray(content.left))) {
+    const left = content.left || (content.pairs || []).map((pair) => pair.left);
+    const right = content.right || (content.pairs || []).map((pair) => pair.right);
+    const start = exampleCountFor(content, left.length);
+    const matches = answer.matches || {};
+    const pairs = content.left ? content.pairs || left.map((_, index) => index) : left.map((_, index) => index);
+    return left.slice(start).map((question, offset) => {
+      const index = offset + start;
+      const selectedIndex = Array.isArray(matches)
+        ? right.indexOf(matches.find((pair) => pair.left === question)?.right)
+        : matches[String(index)];
+      const correctIndex = pairs[index];
       return {
-        question: row.sentence || `${row.before || ''} ___ ${row.after || ''}`.trim(),
-        selected: options[selectedIndex] ?? selectedIndex,
-        correct: options[correctIndex] ?? correctIndex,
-        isCorrect: selectedIndex === correctIndex,
+        question,
+        selected: right[selectedIndex] ?? selectedIndex,
+        correct: right[correctIndex] ?? correctIndex,
+        isCorrect: selectedIndex !== undefined && Number(selectedIndex) === Number(correctIndex),
       };
     });
   }
 
-  if (type === 'fill_blank' || (type === 'reading' && (content.sentences || content.items))) {
+  const writtenSource = content.sentences || content.items || [];
+  const hasWrittenRows = writtenSource.length > 0 && writtenSource.every((row) => !Array.isArray(row.options));
+  if (type === 'fill_blank' || (['reading', 'listening'].includes(type) && hasWrittenRows)) {
     const source = content.sentences || content.items || [];
-    const rows = scorableRows(source);
-    const answers = Array.isArray(answer.answers) ? answer.answers : [];
-    const correctValues = feedbackRows(feedback.correct_answers, source);
+    const rows = scorableRows(source, content);
+    const answers = answer.answers || [];
+    const correctValues = feedbackRows(feedback.correct_answers, source, content);
     return rows.map((row, index) => {
       const selected = answers[index];
       const correct = correctValues[index] ?? row.answer;
@@ -81,42 +106,46 @@ function buildAnswerRows(attempt) {
         question: row.text || row.sentence || `Savol ${index + 1}`,
         selected,
         correct,
-        isCorrect: String(selected || '').trim().toLowerCase() === String(correct || '').trim().toLowerCase(),
+        isCorrect: writtenMatches(row, selected, correct),
       };
     });
   }
 
-  if (type === 'listening' || type === 'reading') {
-    const source = content.questions || content.items || [];
-    const rows = scorableRows(source);
+  if (['choose_correct', 'listening', 'reading'].includes(type)) {
+    const source = content.questions || content.sentences || content.items || [];
+    const rows = scorableRows(source, content);
     const answers = answer.answers && typeof answer.answers === 'object' ? answer.answers : {};
-    const correctValues = feedbackRows(feedback.correct_indices, source);
+    const correctValues = feedbackRows(feedback.correct_indices, source, content);
     return rows.map((row, index) => {
       const options = row.options || [];
       const selectedIndex = answers[String(index)];
-      const correctIndex = correctValues[index] ?? row.correct ?? row.correct_index;
+      const correctIndex = correctValues[index] ?? row.correct_indices ?? row.correct ?? row.correct_index;
+      const expected = Array.isArray(correctIndex) ? { correct_indices: correctIndex } : { correct: correctIndex };
+      const optionText = (value) => Array.isArray(value)
+        ? value.map((optionIndex) => options[optionIndex] ?? optionIndex)
+        : options[value] ?? value;
       return {
-        question: row.question || row.sentence || `Savol ${index + 1}`,
-        selected: options[selectedIndex] ?? selectedIndex,
-        correct: options[correctIndex] ?? correctIndex,
-        isCorrect: selectedIndex === correctIndex,
+        question: row.question || row.sentence || row.text || (row.before || row.after ? `${row.before || ''} ___ ${row.after || ''}`.trim() : `Savol ${index + 1}`),
+        selected: optionText(selectedIndex),
+        correct: optionText(correctIndex),
+        isCorrect: answerMatches(expected, selectedIndex),
       };
     });
   }
 
-  if (type === 'matching' && Array.isArray(content.left) && Array.isArray(content.right)) {
-    const start = content.left.length >= 2 ? 1 : 0;
-    const matches = answer.matches || {};
-    const pairs = content.pairs || content.left.map((_, index) => index);
-    return content.left.slice(start).map((left, offset) => {
-      const index = offset + start;
-      const selectedIndex = matches[String(index)];
-      const correctIndex = pairs[index];
+  if (type === 'written_answer' || type === 'word_order') {
+    const source = type === 'word_order' ? content.items || [] : content.questions || [];
+    const rows = scorableRows(source, content);
+    const answers = answer.answers || [];
+    const correctValues = feedbackRows(feedback.correct_answers, source, content);
+    return rows.map((row, index) => {
+      const selected = answers[index];
+      const correct = correctValues[index] ?? row.answer;
       return {
-        question: left,
-        selected: content.right[selectedIndex] ?? selectedIndex,
-        correct: content.right[correctIndex] ?? correctIndex,
-        isCorrect: Number(selectedIndex) === Number(correctIndex),
+        question: row.prompt || (row.tokens || []).join(' ') || `Savol ${index + 1}`,
+        selected,
+        correct,
+        isCorrect: writtenMatches(row, selected, correct),
       };
     });
   }

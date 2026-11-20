@@ -109,10 +109,17 @@ class Vocabulary(models.Model):
     example = models.TextField(blank=True)            # Example sentence (optional)
     order = models.PositiveIntegerField(default=0)
     source = models.CharField(max_length=100, blank=True, db_index=True)
+    source_key = models.CharField(max_length=160, blank=True, db_index=True)
     source_unit = models.PositiveSmallIntegerField(null=True, blank=True)
 
     class Meta:
         ordering = ['order', 'id']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['source', 'source_key'], condition=~models.Q(source_key=''),
+                name='unique_vocabulary_book_source_key',
+            ),
+        ]
 
     def __str__(self):
         return f"{self.word} — {self.translation}"

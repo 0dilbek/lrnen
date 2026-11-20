@@ -8,6 +8,7 @@ import ListeningExercise from './ListeningExercise';
 import ReadingExercise from './ReadingExercise';
 import WordOrderExercise from './WordOrderExercise';
 import WrittenAnswerExercise from './WrittenAnswerExercise';
+import BookPageViewer from './BookPageViewer';
 import { useLanguage } from '../../context/LanguageContext';
 
 const TYPE_META = {
@@ -59,6 +60,7 @@ export default function ExerciseBlock({ exercise }) {
   const [result, setResult] = useState(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
+  const source = exercise.content?.provenance;
 
   const meta = TYPE_META[exercise.type] || {
     label: exercise.type,
@@ -94,9 +96,13 @@ export default function ExerciseBlock({ exercise }) {
     word_order: WordOrderExercise,
     written_answer: WrittenAnswerExercise,
   }[exercise.type];
+  const content = exercise.content || {};
+  const genericPages = ['choose_correct', 'fill_blank', 'matching'].includes(exercise.type)
+    ? [...(content.pages || []), ...(content.image_url ? [content.image_url] : []), ...(content.images || [])]
+    : [];
 
   return (
-    <div className="student-card overflow-hidden">
+    <div className="student-card overflow-hidden" data-exercise-id={exercise.id}>
       <button
         onClick={() => setOpen((o) => !o)}
         className="w-full flex items-center gap-3 px-5 py-4 hover:bg-surface-200/40 transition text-left"
@@ -105,7 +111,14 @@ export default function ExerciseBlock({ exercise }) {
           <Icon size={13} />
           {t(meta.label)}
         </span>
-        <span className="flex-1 text-sm font-medium stu-body">{exercise.instruction}</span>
+        <span className="min-w-0 flex-1 text-sm font-medium stu-body">
+          {exercise.instruction}
+          {source && (
+            <span className="mt-1 block text-[10px] font-semibold stu-muted">
+              Level {source.level} · {source.book === 'course' ? 'Course Book' : 'Practice Book'} · {source.activity}
+            </span>
+          )}
+        </span>
         {result && (
           <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
             result.correct === result.total ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' : 'bg-orange-500/15 text-orange-700 dark:text-orange-300'
@@ -119,6 +132,7 @@ export default function ExerciseBlock({ exercise }) {
 
       {open && Component && (
         <div className="px-5 pb-5 border-t border-border pt-4">
+          {genericPages.length > 0 && <div className="mb-5"><BookPageViewer pages={genericPages} title={t('Topshiriq manbasi')} /></div>}
           <Component exercise={exercise} onComplete={handleComplete} />
         </div>
       )}

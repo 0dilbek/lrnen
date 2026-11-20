@@ -3,6 +3,7 @@ import { CheckCircle2, ChevronRight, RotateCcw, XCircle } from 'lucide-react';
 import BookPageViewer from './BookPageViewer';
 import ExampleBadge from './ExampleBadge';
 import { useLanguage } from '../../context/LanguageContext';
+import { exampleCountFor } from '../../utils/exerciseChoices';
 
 const normalize = (value) => String(value || '')
   .replace(/[‘’]/g, "'")
@@ -14,11 +15,12 @@ const normalize = (value) => String(value || '')
 export default function WrittenAnswerExercise({ exercise, onComplete }) {
   const { t } = useLanguage();
   const questions = useMemo(() => exercise.content?.questions || [], [exercise.content?.questions]);
-  const hasExample = questions.length >= 2;
-  const initial = useMemo(() => hasExample ? { 0: questions[0]?.answer || '' } : {}, [questions, hasExample]);
+  const exampleCount = exampleCountFor(exercise.content, questions.length);
+  const hasExample = exampleCount > 0;
+  const initial = useMemo(() => Object.fromEntries(questions.slice(0, exampleCount).map((question, index) => [index, question.answer || ''])), [questions, exampleCount]);
   const [answers, setAnswers] = useState(initial);
   const [checked, setChecked] = useState(false);
-  const scorableIndices = questions.map((_, index) => index).filter((index) => !hasExample || index > 0);
+  const scorableIndices = questions.map((_, index) => index).filter((index) => index >= exampleCount);
 
   const correctFor = (index) => {
     const accepted = [questions[index].answer, ...(questions[index].alternatives || [])].map(normalize);
@@ -39,7 +41,7 @@ export default function WrittenAnswerExercise({ exercise, onComplete }) {
       {!!exercise.content?.pages?.length && <BookPageViewer pages={exercise.content.pages} title={t('Course Book manbasi')} />}
       {hasExample && <p className="text-xs italic stu-muted">{t('Birinchi javob namuna. Qolgan javoblarni to‘liq gap bilan yozing.')}</p>}
       {questions.map((question, index) => {
-        const isExample = hasExample && index === 0;
+        const isExample = index < exampleCount;
         const isCorrect = (checked || isExample) && correctFor(index);
         return (
           <div key={index} className={`rounded-2xl border-2 p-5 ${isExample ? 'border-amber-500/30 bg-amber-500/5' : checked ? (isCorrect ? 'border-emerald-500/40 bg-emerald-500/10' : 'border-rose-500/40 bg-rose-500/10') : 'border-border bg-surface-100'}`}>

@@ -3,6 +3,7 @@ import { CheckCircle2, ChevronRight, RotateCcw, XCircle } from 'lucide-react';
 import BookPageViewer from './BookPageViewer';
 import ExampleBadge from './ExampleBadge';
 import { useLanguage } from '../../context/LanguageContext';
+import { exampleCountFor, shuffledIndices } from '../../utils/exerciseChoices';
 
 const normalize = (value) => String(value || '')
   .replace(/[‘’]/g, "'")
@@ -11,38 +12,31 @@ const normalize = (value) => String(value || '')
   .replace(/\s+/g, ' ')
   .replace(/[.!?]+$/, '');
 
-function shuffledIndices(tokens, rowIndex) {
-  return tokens.map((_, index) => index).sort((a, b) => {
-    const score = (index) => [...String(tokens[index])]
-      .reduce((sum, char) => sum + char.charCodeAt(0), (index + 1) * 31 + rowIndex * 17) % 101;
-    return score(a) - score(b) || a - b;
-  });
-}
-
 export default function WordOrderExercise({ exercise, onComplete }) {
   const { t } = useLanguage();
   const items = useMemo(() => exercise.content?.items || [], [exercise.content?.items]);
-  const hasExample = items.length >= 2;
+  const exampleCount = exampleCountFor(exercise.content, items.length);
+  const hasExample = exampleCount > 0;
   const initial = useMemo(() => Object.fromEntries(items.map((item, index) => [
     index,
-    hasExample && index === 0 ? item.tokens.map((_, tokenIndex) => tokenIndex) : [],
-  ])), [items, hasExample]);
-  const shuffled = useMemo(() => items.map((item, index) => shuffledIndices(item.tokens || [], index)), [items]);
+    index < exampleCount ? item.tokens.map((_, tokenIndex) => tokenIndex) : [],
+  ])), [items, exampleCount]);
+  const [shuffled, setShuffled] = useState(() => items.map((item) => shuffledIndices(item.tokens || [])));
   const [selected, setSelected] = useState(initial);
   const [checked, setChecked] = useState(false);
 
   const sentenceFor = (index) => (selected[index] || []).map((tokenIndex) => items[index].tokens[tokenIndex]).join(' ');
   const correctFor = (index) => normalize(sentenceFor(index)) === normalize(items[index].answer);
-  const scorableIndices = items.map((_, index) => index).filter((index) => !hasExample || index > 0);
+  const scorableIndices = items.map((_, index) => index).filter((index) => index >= exampleCount);
   const allDone = scorableIndices.length > 0 && scorableIndices.every((index) => selected[index]?.length === items[index].tokens.length);
 
   const addToken = (rowIndex, tokenIndex) => {
-    if (checked || (hasExample && rowIndex === 0) || selected[rowIndex].includes(tokenIndex)) return;
+    if (checked || rowIndex < exampleCount || selected[rowIndex].includes(tokenIndex)) return;
     setSelected((current) => ({ ...current, [rowIndex]: [...current[rowIndex], tokenIndex] }));
   };
 
   const removeToken = (rowIndex, position) => {
-    if (checked || (hasExample && rowIndex === 0)) return;
+    if (checked || rowIndex < exampleCount) return;
     setSelected((current) => ({
       ...current,
       [rowIndex]: current[rowIndex].filter((_, index) => index !== position),
@@ -59,6 +53,7 @@ export default function WordOrderExercise({ exercise, onComplete }) {
 
   const reset = () => {
     setSelected(initial);
+    setShuffled(items.map((item) => shuffledIndices(item.tokens || [])));
     setChecked(false);
   };
 
@@ -67,7 +62,7 @@ export default function WordOrderExercise({ exercise, onComplete }) {
       {!!exercise.content?.pages?.length && <BookPageViewer pages={exercise.content.pages} title={t('Course Book manbasi')} />}
       {hasExample && <p className="text-xs italic stu-muted">{t('Birinchi gap namuna. So‘zlarni bosib to‘g‘ri gap tuzing.')}</p>}
       {items.map((item, rowIndex) => {
-        const isExample = hasExample && rowIndex === 0;
+        const isExample = rowIndex < exampleCount;
         const isCorrect = (checked || isExample) && correctFor(rowIndex);
         return (
           <div key={rowIndex} className={`rounded-2xl border-2 p-4 ${isExample ? 'border-amber-500/30 bg-amber-500/5' : checked ? (isCorrect ? 'border-emerald-500/40 bg-emerald-500/10' : 'border-rose-500/40 bg-rose-500/10') : 'border-border bg-surface-100'}`}>

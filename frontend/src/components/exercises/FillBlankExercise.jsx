@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { CheckCircle2, XCircle, RotateCcw, ChevronRight, Type } from 'lucide-react';
 import ExampleBadge from './ExampleBadge';
+import { exampleCountFor } from '../../utils/exerciseChoices';
+import { useLanguage } from '../../context/LanguageContext';
 
 function normalizeContent(content) {
   if (content?.sentences) return { sentences: content.sentences, word_panel: content.word_panel };
@@ -17,26 +19,27 @@ function normalizeContent(content) {
 }
 
 export default function FillBlankExercise({ exercise, onComplete }) {
+  const { t } = useLanguage();
   const { sentences, word_panel } = normalizeContent(exercise.content);
-  const hasExample = sentences.length >= 2;
+  const exampleCount = exampleCountFor(exercise.content, sentences.length);
+  const hasExample = exampleCount > 0;
   const answersFor = (sentence) => Array.isArray(sentence.answer) ? sentence.answer : [sentence.answer];
   const inputKey = (sentenceIndex, answerIndex) => `${sentenceIndex}:${answerIndex}`;
-  const exampleInputs = hasExample
-    ? Object.fromEntries(answersFor(sentences[0]).map((answer, index) => [inputKey(0, index), answer]))
-    : {};
+  const exampleInputs = Object.fromEntries(sentences.slice(0, exampleCount).flatMap((sentence, sentenceIndex) =>
+    answersFor(sentence).map((answer, answerIndex) => [inputKey(sentenceIndex, answerIndex), answer])));
 
   const [inputs, setInputs] = useState(() => ({ ...exampleInputs }));
   const [checked, setChecked] = useState(false);
 
   const setInput = (i, answerIndex, val) => {
-    if (checked || (hasExample && i === 0)) return;
+    if (checked || i < exampleCount) return;
     setInputs((p) => ({ ...p, [inputKey(i, answerIndex)]: val }));
   };
 
   const clickWord = (word) => {
     if (checked) return;
     for (let i = 0; i < sentences.length; i += 1) {
-      if (hasExample && i === 0) continue;
+      if (i < exampleCount) continue;
       const answerIndex = answersFor(sentences[i]).findIndex((_, index) => !inputs[inputKey(i, index)]);
       if (answerIndex !== -1) {
         setInput(i, answerIndex, word);
@@ -60,18 +63,18 @@ export default function FillBlankExercise({ exercise, onComplete }) {
   const isCorrect = (i) => answersFor(sentences[i]).every((_, answerIndex) =>
     acceptedFor(sentences[i], answerIndex).includes(normalize(inputs[inputKey(i, answerIndex)])));
 
-  const scorable = hasExample ? sentences.slice(1) : sentences;
+  const scorable = sentences.slice(exampleCount);
   const allFilled = scorable.length > 0 && scorable.every((_, i) => {
-    const idx = hasExample ? i + 1 : i;
+    const idx = i + exampleCount;
     return answersFor(sentences[idx]).every((_, answerIndex) => !!inputs[inputKey(idx, answerIndex)]);
   });
 
   const handleCheck = () => {
     setChecked(true);
-    const correct = scorable.filter((_, i) => isCorrect(hasExample ? i + 1 : i)).length;
+    const correct = scorable.filter((_, i) => isCorrect(i + exampleCount)).length;
     if (onComplete) onComplete(correct, scorable.length, {
       answers: scorable.map((_, i) => {
-        const sentenceIndex = hasExample ? i + 1 : i;
+        const sentenceIndex = i + exampleCount;
         const values = answersFor(sentences[sentenceIndex]).map((_, answerIndex) => inputs[inputKey(sentenceIndex, answerIndex)] || '');
         return values.length === 1 ? values[0] : values;
       }),
@@ -84,14 +87,14 @@ export default function FillBlankExercise({ exercise, onComplete }) {
   };
 
   const score = checked
-    ? scorable.filter((_, i) => isCorrect(hasExample ? i + 1 : i)).length
+    ? scorable.filter((_, i) => isCorrect(i + exampleCount)).length
     : null;
 
   return (
     <div className="max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
       {hasExample && (
         <p className="text-xs stu-muted mb-4 italic">
-          1-savol namuna — shunday yechiladi. Siz 2-savoldan boshlang.
+          {t('Belgilangani namuna. Qolgan savollarga javob bering.')}
         </p>
       )}
 
@@ -118,7 +121,7 @@ export default function FillBlankExercise({ exercise, onComplete }) {
 
       <div className="space-y-4 mb-10">
         {sentences.map((s, i) => {
-          const isExample = hasExample && i === 0;
+          const isExample = i < exampleCount;
           const correct = (checked || isExample) && isCorrect(i);
           const wrong = checked && !isExample && !isCorrect(i);
           const answers = answersFor(s);

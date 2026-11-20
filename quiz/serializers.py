@@ -53,8 +53,13 @@ class ExerciseSerializer(serializers.ModelSerializer):
         model = Exercise
         fields = [
             'id', 'lesson', 'type', 'instruction', 'instruction_kaa', 'instruction_uz',
-            'content', 'has_audio', 'audio_url', 'order', 'source', 'source_unit',
+            'content', 'has_audio', 'audio_url', 'order', 'source', 'source_unit', 'source_key',
         ]
+        read_only_fields = ['source_key']
+        # Import keys are assigned only by the reviewed importer. Let the DB
+        # enforce their conditional uniqueness without requiring a source on
+        # ordinary manually authored exercises.
+        validators = []
 
     def validate_content(self, value):
         if not isinstance(value, dict):
@@ -92,8 +97,22 @@ class ExerciseSerializer(serializers.ModelSerializer):
                 normalized = [str(option).strip().casefold() for option in options]
                 if len(normalized) != len(set(normalized)):
                     raise serializers.ValidationError({'content': f'{index}-savolda takroriy variant bor.'})
-                if not isinstance(correct, int) or not 0 <= correct < len(options):
+                multiple = row.get('correct_indices')
+                if multiple is not None:
+                    if (
+                        not isinstance(multiple, list) or not multiple
+                        or any(type(value) is not int or not 0 <= value < len(options) for value in multiple)
+                        or len(set(multiple)) != len(multiple)
+                    ):
+                        raise serializers.ValidationError({'content': f'{index}-savolning to‘g‘ri javoblar ro‘yxati noto‘g‘ri.'})
+                elif type(correct) is not int or not 0 <= correct < len(options):
                     raise serializers.ValidationError({'content': f'{index}-savolning to‘g‘ri javob indeksi noto‘g‘ri.'})
+
+        if 'example_count' in content:
+            rows = content.get('questions') or content.get('sentences') or content.get('items') or content.get('left') or []
+            count = content['example_count']
+            if type(count) is not int or not 0 <= count < len(rows):
+                raise serializers.ValidationError({'content': 'Namuna soni qatorlar sonidan kichik bo‘lishi kerak.'})
 
         if exercise_type == 'choose_correct':
             validate_choice_rows(

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import api, { getApiErrorMessage } from '../../api';
+import { correctIndices, exampleCountFor } from '../../utils/exerciseChoices';
 import {
   Plus, Pencil, Trash2, Loader2, BookOpen,
   X, Check,
@@ -1030,7 +1031,8 @@ function ExerciseModal({ data, lessons, onClose, onSave }) {
             />
             {type === 'listening' && (
               <AudioLibraryPicker
-                unit={lessons.find((lesson) => lesson.id === Number(lessonId))?.order}
+                key={lessonId}
+                unit={data?.source_unit || lessons.find((lesson) => lesson.id === Number(lessonId))?.order}
                 selected={audioUrl}
                 onSelect={(url) => { setAudioUrl(url); setHasAudio(true); }}
               />
@@ -1039,6 +1041,9 @@ function ExerciseModal({ data, lessons, onClose, onSave }) {
         )}
 
         {type === 'listening' && (
+          <BookPagePicker pages={content.pages || []} onChange={(pages) => setContent({ ...content, pages })} compact />
+        )}
+        {['choose_correct', 'fill_blank', 'matching', 'word_order', 'written_answer'].includes(type) && (
           <BookPagePicker pages={content.pages || []} onChange={(pages) => setContent({ ...content, pages })} compact />
         )}
 
@@ -1059,7 +1064,11 @@ function ExerciseModal({ data, lessons, onClose, onSave }) {
           <MatchingEditor content={content} setContent={setContent} />
         )}
         {type === 'listening' && (
-          <ListeningEditor content={content} setContent={setContent} sourceAudioUrl={audioUrl} />
+          Array.isArray(content.left) && Array.isArray(content.right)
+            ? <MatchingEditor content={content} setContent={setContent} sourceAudioUrl={audioUrl} enableRowAudio />
+            : Array.isArray(content.sentences) || (Array.isArray(content.items) && content.items.some((item) => item.answer !== undefined))
+              ? <FillBlankEditor content={content} setContent={setContent} sourceAudioUrl={audioUrl} enableRowAudio />
+              : <ListeningEditor content={content} setContent={setContent} sourceAudioUrl={audioUrl} />
         )}
         {type === 'reading' && (
           <ReadingEditor content={content} setContent={setContent} />
@@ -1098,7 +1107,7 @@ function ChooseCorrectEditor({ content, setContent }) {
   const sentences = content.sentences || [];
   const update = (i, key, val) => {
     const s = sentences.map((s, si) => si === i ? { ...s, [key]: val } : s);
-    setContent({ sentences: s });
+    setContent({ ...content, sentences: s });
   };
   const updateOption = (i, oi, val) => {
     const s = sentences.map((s, si) => {
@@ -1106,10 +1115,10 @@ function ChooseCorrectEditor({ content, setContent }) {
       const opts = [...s.options]; opts[oi] = val;
       return { ...s, options: opts };
     });
-    setContent({ sentences: s });
+    setContent({ ...content, sentences: s });
   };
-  const addSentence = () => setContent({ sentences: [...sentences, { before: '', options: ['', ''], after: '', correct: 0 }] });
-  const removeSentence = (i) => setContent({ sentences: sentences.filter((_, si) => si !== i) });
+  const addSentence = () => setContent({ ...content, sentences: [...sentences, { before: '', options: ['', ''], after: '', correct: 0 }] });
+  const removeSentence = (i) => setContent({ ...content, sentences: sentences.filter((_, si) => si !== i) });
 
   return (
     <div className="space-y-3">
@@ -1147,17 +1156,31 @@ function ChooseCorrectEditor({ content, setContent }) {
 }
 
 /* fill_blank content editor */
-function FillBlankEditor({ content, setContent }) {
-  const sentences = content.sentences || [];
+function FillBlankEditor({ content, setContent, sourceAudioUrl = '', enableRowAudio = false }) {
+  const rowsKey = Array.isArray(content.sentences) ? 'sentences' : Array.isArray(content.items) ? 'items' : 'sentences';
+  const sentences = content[rowsKey] || [];
   const wordPanel = content.word_panel || [];
+  const audioUrls = Array.isArray(content.audio_urls) ? content.audio_urls : [];
   const [wordInput, setWordInput] = useState('');
 
   const updateSentence = (i, key, val) => {
     const s = sentences.map((s, si) => si === i ? { ...s, [key]: val } : s);
-    setContent({ ...content, sentences: s });
+    setContent({ ...content, [rowsKey]: s });
   };
-  const addSentence = () => setContent({ ...content, sentences: [...sentences, { text: '', answer: '' }] });
-  const removeSentence = (i) => setContent({ ...content, sentences: sentences.filter((_, si) => si !== i) });
+  const addSentence = () => setContent({
+    ...content,
+    [rowsKey]: [...sentences, { [rowsKey === 'items' ? 'sentence' : 'text']: '', answer: '' }],
+    ...(enableRowAudio || content.audio_urls ? { audio_urls: [...sentences.map((_, index) => audioUrls[index] || ''), ''] } : {}),
+  });
+  const removeSentence = (i) => setContent({
+    ...content,
+    [rowsKey]: sentences.filter((_, si) => si !== i),
+    ...(content.audio_urls ? { audio_urls: sentences.map((_, index) => audioUrls[index] || '').filter((_, index) => index !== i) } : {}),
+  });
+  const updateAudio = (index, url) => setContent({
+    ...content,
+    audio_urls: sentences.map((_, rowIndex) => rowIndex === index ? url : audioUrls[rowIndex] || ''),
+  });
   const addWord = () => {
     const w = wordInput.trim();
     if (!w) return;
@@ -1171,8 +1194,17 @@ function FillBlankEditor({ content, setContent }) {
       <label className="block text-sm font-medium">Gaplar (___ = bo'sh joy)</label>
       {sentences.map((s, i) => (
         <div key={i} className="admin-panel-alt rounded-xl p-3 space-y-2 border">
-          <input value={s.text} onChange={(e) => updateSentence(i, 'text', e.target.value)} placeholder="We ___ Australian." className="admin-input-sm w-full" />
-          <input value={s.answer} onChange={(e) => updateSentence(i, 'answer', e.target.value)} placeholder="To'g'ri javob..." className="w-full rounded-lg border border-green-500/35 bg-green-500/10 px-3 py-2 text-sm admin-text-body focus:outline-none focus:ring-1 focus:ring-green-500/30" />
+          <input value={s.text ?? s.sentence ?? ''} onChange={(e) => updateSentence(i, s.text !== undefined || s.sentence === undefined ? 'text' : 'sentence', e.target.value)} placeholder="We ___ Australian." className="admin-input-sm w-full" />
+          <input
+            value={Array.isArray(s.answer) ? s.answer.join(' | ') : s.answer ?? ''}
+            onChange={(e) => updateSentence(i, 'answer', Array.isArray(s.answer) || ((s.text ?? s.sentence ?? '').match(/___/g) || []).length > 1
+              ? e.target.value.split('|').map((answer) => answer.trim())
+              : e.target.value)}
+            placeholder="To'g'ri javob..."
+            className="w-full rounded-lg border border-green-500/35 bg-green-500/10 px-3 py-2 text-sm admin-text-body focus:outline-none focus:ring-1 focus:ring-green-500/30"
+          />
+          {(Array.isArray(s.answer) || ((s.text ?? s.sentence ?? '').match(/___/g) || []).length > 1) && <p className="text-[11px] admin-text-muted">Har bir bo‘sh joy javobini | bilan ajrating: from | to</p>}
+          {enableRowAudio && <QuestionAudioEditor value={audioUrls[i] || ''} sourceAudioUrl={sourceAudioUrl} name={`listening-row-${i + 1}`} onChange={(url) => updateAudio(i, url)} />}
           {sentences.length > 1 && <button onClick={() => removeSentence(i)} className="text-xs text-red-400 hover:text-red-600">− O'chirish</button>}
         </div>
       ))}
@@ -1198,44 +1230,64 @@ function FillBlankEditor({ content, setContent }) {
 }
 
 /* matching content editor */
-function MatchingEditor({ content, setContent }) {
+function MatchingEditor({ content, setContent, sourceAudioUrl = '', enableRowAudio = false }) {
   const left = content.left || [];
   const right = content.right || [];
   const pairs = content.pairs || [];
+  const audioUrls = Array.isArray(content.audio_urls) ? content.audio_urls : [];
 
   const updateLeft = (i, val) => {
     const l = [...left]; l[i] = val;
-    setContent({ left: l, right, pairs });
+    setContent({ ...content, left: l, right, pairs });
   };
   const updateRight = (i, val) => {
     const r = [...right]; r[i] = val;
-    setContent({ left, right: r, pairs });
+    setContent({ ...content, left, right: r, pairs });
   };
   const addPair = () => {
-    setContent({ left: [...left, ''], right: [...right, ''], pairs: [...pairs, right.length] });
+    setContent({
+      ...content, left: [...left, ''], right: [...right, ''], pairs: [...pairs, right.length],
+      ...(enableRowAudio || content.audio_urls ? { audio_urls: [...left.map((_, index) => audioUrls[index] || ''), ''] } : {}),
+    });
   };
   const removePair = (i) => {
     setContent({
+      ...content,
       left: left.filter((_, li) => li !== i),
-      right: right.filter((_, ri) => ri !== i),
-      pairs: pairs.filter((_, pi) => pi !== i).map((p) => (p > i ? p - 1 : p)),
+      // Right-side options can be reused by several left rows; removing a
+      // question must not remove or renumber another question's answer.
+      pairs: pairs.filter((_, pi) => pi !== i),
+      ...(content.audio_urls ? { audio_urls: left.map((_, index) => audioUrls[index] || '').filter((_, index) => index !== i) } : {}),
     });
   };
+  const updatePair = (index, value) => setContent({
+    ...content, pairs: left.map((_, rowIndex) => rowIndex === index ? Number(value) : pairs[rowIndex]),
+  });
+  const updateAudio = (index, url) => setContent({
+    ...content, audio_urls: left.map((_, rowIndex) => rowIndex === index ? url : audioUrls[rowIndex] || ''),
+  });
 
   return (
     <div className="space-y-2">
-      <div className="grid grid-cols-2 gap-2 text-xs font-medium admin-text-muted px-1">
-        <span>Chap (savol)</span>
-        <span>O'ng (javob)</span>
-      </div>
+      <p className="text-xs font-medium admin-text-muted">Har bir savolning to‘g‘ri javobini tanlang. Bitta javob bir nechta savolga mos kelishi mumkin.</p>
       {left.map((_, i) => (
-        <div key={i} className="flex gap-2 items-center">
-          <input value={left[i] || ''} onChange={(e) => updateLeft(i, e.target.value)} placeholder={`Chap ${i + 1}`} className="admin-input-sm flex-1" />
-          <span className="admin-text-muted shrink-0">→</span>
-          <input value={right[i] || ''} onChange={(e) => updateRight(i, e.target.value)} placeholder={`O'ng ${i + 1}`} className="admin-input-sm flex-1" />
-          {left.length > 1 && <button onClick={() => removePair(i)} className="p-1 admin-text-muted hover:text-red-400"><X size={13} /></button>}
+        <div key={i} className="admin-panel-alt space-y-2 rounded-xl border p-3">
+          <div className="flex gap-2 items-center">
+            <input value={left[i] || ''} onChange={(e) => updateLeft(i, e.target.value)} placeholder={`Chap ${i + 1}`} className="admin-input-sm min-w-0 flex-1" />
+            <span className="admin-text-muted shrink-0">→</span>
+            <select value={pairs[i] ?? ''} onChange={(event) => updatePair(i, event.target.value)} aria-label={`${i + 1}-savolning javobi`} className="admin-input-sm min-w-0 flex-1">
+              <option value="" disabled>Javob tanlang</option>
+              {right.map((option, optionIndex) => <option key={optionIndex} value={optionIndex}>{option || `${optionIndex + 1}-variant`}</option>)}
+            </select>
+            {left.length > 1 && <button type="button" onClick={() => removePair(i)} className="p-1 admin-text-muted hover:text-red-400" aria-label={`${i + 1}-savolni o‘chirish`}><X size={13} /></button>}
+          </div>
+          {enableRowAudio && <QuestionAudioEditor value={audioUrls[i] || ''} sourceAudioUrl={sourceAudioUrl} name={`listening-pair-${i + 1}`} onChange={(url) => updateAudio(i, url)} />}
         </div>
       ))}
+      <div className="rounded-xl border border-border p-3">
+        <p className="mb-2 text-xs font-semibold admin-text-body">Javob variantlari</p>
+        <div className="grid gap-2 sm:grid-cols-2">{right.map((option, index) => <input key={index} value={option || ''} onChange={(event) => updateRight(index, event.target.value)} placeholder={`${index + 1}-variant`} className="admin-input-sm w-full" />)}</div>
+      </div>
       <p className="text-xs admin-text-muted">* O'ng tomoni avtomatik aralashtiriladi</p>
       <button onClick={addPair} className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"><Plus size={12} /> Juft qo'shish</button>
     </div>
@@ -1246,6 +1298,7 @@ function MatchingEditor({ content, setContent }) {
 function ListeningEditor({ content, setContent, label = 'Tinglash savollari', sourceAudioUrl = '', enableRowAudio = true }) {
   const questions = content.questions || [];
   const audioUrls = Array.isArray(content.audio_urls) ? content.audio_urls : [];
+  const exampleCount = exampleCountFor(content, questions.length);
 
   const updateQ = (i, key, val) => {
     const qs = questions.map((q, qi) => qi === i ? { ...q, [key]: val } : q);
@@ -1259,6 +1312,27 @@ function ListeningEditor({ content, setContent, label = 'Tinglash savollari', so
     });
     setContent({ ...content, questions: qs });
   };
+  const setMultiple = (index, enabled) => {
+    const qs = questions.map((row, rowIndex) => {
+      if (rowIndex !== index) return row;
+      const next = { ...row, correct: correctIndices(row)[0] ?? 0 };
+      if (enabled) next.correct_indices = correctIndices(row);
+      else delete next.correct_indices;
+      return next;
+    });
+    setContent({ ...content, questions: qs });
+  };
+  const selectCorrect = (index, optionIndex) => {
+    const row = questions[index];
+    if (!Array.isArray(row.correct_indices)) {
+      updateQ(index, 'correct', optionIndex);
+      return;
+    }
+    const selected = correctIndices(row);
+    updateQ(index, 'correct_indices', selected.includes(optionIndex)
+      ? selected.filter((value) => value !== optionIndex)
+      : [...selected, optionIndex]);
+  };
   const updateAudio = (index, url) => {
     const next = Array.from({ length: questions.length }, (_, audioIndex) => audioUrls[audioIndex] || '');
     next[index] = url;
@@ -1267,7 +1341,7 @@ function ListeningEditor({ content, setContent, label = 'Tinglash savollari', so
   const addQuestion = () => setContent({
     ...content,
     questions: [...questions, { question: '', options: ['', '', '', ''], correct: 0 }],
-    audio_urls: [...audioUrls, ''],
+    audio_urls: [...questions.map((_, index) => audioUrls[index] || ''), ''],
   });
   const removeQuestion = (i) => setContent({
     ...content,
@@ -1278,9 +1352,13 @@ function ListeningEditor({ content, setContent, label = 'Tinglash savollari', so
   return (
     <div className="space-y-3">
       <label className="block text-sm font-medium">{label}</label>
+      <label className="flex items-center gap-2 text-xs admin-text-muted">
+        <input type="checkbox" checked={exampleCount > 0} onChange={(event) => setContent({ ...content, example_count: event.target.checked ? 1 : 0 })} />
+        Birinchi savol namuna sifatida ko‘rsatilsin
+      </label>
       {questions.map((q, i) => (
-        <div key={i} className={`border rounded-xl p-3 space-y-2 ${i === 0 ? 'border-amber-400/50 bg-amber-500/5' : 'border-teal-400/30 bg-teal-500/5'}`}>
-          {i === 0 && <p className="text-[10px] font-black uppercase tracking-wider text-amber-500">Namuna · ballga kirmaydi</p>}
+        <div key={i} className={`border rounded-xl p-3 space-y-2 ${i < exampleCount ? 'border-amber-400/50 bg-amber-500/5' : 'border-teal-400/30 bg-teal-500/5'}`}>
+          {i < exampleCount && <p className="text-[10px] font-black uppercase tracking-wider text-amber-500">Namuna · ballga kirmaydi</p>}
           <input
             value={q.question}
             onChange={(e) => updateQ(i, 'question', e.target.value)}
@@ -1295,15 +1373,19 @@ function ListeningEditor({ content, setContent, label = 'Tinglash savollari', so
               onChange={(url) => updateAudio(i, url)}
             />
           )}
-          <p className="text-xs admin-text-muted">Variantlar (to'g'risini radio bilan belgilang):</p>
+          <label className="flex items-center gap-2 text-xs font-semibold admin-text-body"><input type="checkbox" checked={Array.isArray(q.correct_indices)} onChange={(event) => setMultiple(i, event.target.checked)} />Bir nechta to‘g‘ri javob</label>
+          <p className="text-xs admin-text-muted">To‘g‘ri variantlarni belgilang:</p>
           <div className="space-y-1.5">
             {q.options.map((opt, oi) => (
               <div key={oi} className="flex items-center gap-2">
                 <button
-                  onClick={() => updateQ(i, 'correct', oi)}
-                  className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${q.correct === oi ? 'border-green-500 bg-green-500' : 'border-border'}`}
+                  type="button"
+                  role={Array.isArray(q.correct_indices) ? 'checkbox' : 'radio'}
+                  aria-checked={correctIndices(q).includes(oi)}
+                  onClick={() => selectCorrect(i, oi)}
+                  className={`w-5 h-5 ${Array.isArray(q.correct_indices) ? 'rounded' : 'rounded-full'} border-2 flex items-center justify-center shrink-0 ${correctIndices(q).includes(oi) ? 'border-green-500 bg-green-500' : 'border-border'}`}
                 >
-                  {q.correct === oi && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                  {correctIndices(q).includes(oi) && <Check size={12} className="text-white" />}
                 </button>
                 <input
                   value={opt}
@@ -1517,25 +1599,51 @@ function AudioLibraryPicker({ unit, selected, onSelect }) {
   const [assets, setAssets] = useState([]);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
+  const initialSource = selected?.match(/\/audio\/books\/level([12])\/(course|practice)\/(\d+)\//);
+  const [book, setBook] = useState(initialSource?.[2] || 'legacy');
+  const [level, setLevel] = useState(initialSource?.[1] || '1');
+  const [selectedUnit, setSelectedUnit] = useState(initialSource?.[3] || (unit ? String(unit) : ''));
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (!open) return;
-    const unitQuery = unit ? `&unit=${encodeURIComponent(unit)}` : '';
-    api.get(`/quiz/assets/?kind=audio${unitQuery}`)
-      .then(({ data }) => setAssets(data.results || []))
-      .finally(() => setLoading(false));
-  }, [open, unit]);
+    let active = true;
+    const params = new URLSearchParams({ kind: 'audio' });
+    if (selectedUnit) params.set('unit', selectedUnit);
+    if (book !== 'legacy') {
+      params.set('level', level);
+      params.set('book', book);
+    }
+    setLoading(true);
+    setError('');
+    api.get(`/quiz/assets/?${params}`)
+      .then(({ data }) => { if (active) setAssets(data.results || []); })
+      .catch((requestError) => {
+        if (active) {
+          setAssets([]);
+          setError(getApiErrorMessage(requestError, 'Audio kutubxonasini yuklab bo‘lmadi.'));
+        }
+      })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [open, selectedUnit, book, level]);
 
   const filtered = assets.filter((asset) => !query || asset.name.toLowerCase().includes(query.toLowerCase()));
   return (
     <div className="rounded-xl border border-teal-500/25 bg-teal-500/5 p-3">
       <button type="button" onClick={() => { if (!open) setLoading(true); setOpen((value) => !value); }} className="flex items-center justify-between gap-3 w-full text-left">
-        <span className="inline-flex items-center gap-2 text-xs font-bold text-teal-500"><Music2 size={14} /> Audio kutubxonasi {unit ? `· Unit ${unit}` : ''}</span>
+        <span className="inline-flex items-center gap-2 text-xs font-bold text-teal-500"><Music2 size={14} /> Audio kutubxonasi {selectedUnit ? `· Unit ${selectedUnit}` : ''}</span>
         <span className="text-xs admin-text-muted">{open ? 'Yopish' : 'Tanlash'}</span>
       </button>
       {open && (
         <div className="mt-3 space-y-2">
+          <div className="grid gap-2 sm:grid-cols-3">
+            <label className="text-[11px] font-bold admin-text-muted">Audio manbasi<select value={book} onChange={(event) => setBook(event.target.value)} className="admin-input-sm mt-1 w-full"><option value="legacy">Mavjud audio kutubxonasi</option><option value="course">Course Book</option><option value="practice">Practice Book</option></select></label>
+            <label className="text-[11px] font-bold admin-text-muted">Kitob darajasi<select value={level} disabled={book === 'legacy'} onChange={(event) => setLevel(event.target.value)} className="admin-input-sm mt-1 w-full disabled:opacity-50"><option value="1">Level 1 — Beginner</option><option value="2">Level 2 — Beginner</option></select></label>
+            <label className="text-[11px] font-bold admin-text-muted">Unit<input type="number" min="1" value={selectedUnit} onChange={(event) => setSelectedUnit(event.target.value)} placeholder="Barcha unitlar" className="admin-input-sm mt-1 w-full" /></label>
+          </div>
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Trekni qidiring..." className="admin-input-sm w-full" />
+          {error && <p className="text-xs text-red-500">{error}</p>}
           <div className="max-h-48 overflow-y-auto space-y-1">
             {loading && <Loader2 className="animate-spin text-teal-500 mx-auto my-5" />}
             {!loading && filtered.map((asset) => (

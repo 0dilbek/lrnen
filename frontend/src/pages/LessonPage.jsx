@@ -19,6 +19,15 @@ function getYoutubeId(url) {
   return match ? match[1] : null;
 }
 
+function exerciseSourcePriority(exercise) {
+  const provenance = exercise.content?.provenance || {};
+  if (/(?:^|\.)review(?:\.|$)/i.test(exercise.source_key || '')
+    || /^review(?:\.|$)/i.test(provenance.activity || '')
+    || provenance.role === 'review') return 2;
+  if (provenance.book === 'course' || exercise.source === 'course_book_pilot_v1') return 0;
+  return 1;
+}
+
 function Confetti() {
   const colors = ['#6366f1','#06b6d4','#10b981','#f59e0b','#ec4899','#f97316'];
   const pseudoRandom = (seed) => ((seed * 9301 + 49297) % 233280) / 233280;
@@ -328,7 +337,11 @@ export default function LessonPage() {
   const displayTitle = formatLessonTitle(lesson.title);
   const displayDesc = formatLessonDescription(lesson.description);
   const readingExercises = exercises.filter((exercise) => exercise.type === 'reading');
-  const practiceExercises = exercises.filter((exercise) => exercise.type !== 'reading');
+  const practiceExercises = exercises
+    .filter((exercise) => exercise.type !== 'reading')
+    .map((exercise, index) => ({ exercise, index }))
+    .sort((a, b) => exerciseSourcePriority(a.exercise) - exerciseSourcePriority(b.exercise) || a.index - b.index)
+    .map(({ exercise }) => exercise);
 
   return (
     <MediaProtectionProvider identity={`${user?.username || 'student'} · ${user?.id || ''}`}>
@@ -388,7 +401,7 @@ export default function LessonPage() {
         <section className="mb-8">
           <SectionTitle emoji="📖" title={t('Dars haqida')} />
           <div className="student-panel">
-            <p className="text-base leading-relaxed stu-body">{displayDesc}</p>
+            <p className="whitespace-pre-line text-base leading-relaxed stu-body">{displayDesc}</p>
           </div>
         </section>
       )}

@@ -47,7 +47,7 @@ lrnen/
 - **7 learning levels** — A1, A2, B1, B2, C1, C2, IELTS
 - **Video lessons** with descriptions and ordering
 - **Vocabulary** — English/Uzbek translations with examples
-- **6 exercise types** — choose_correct, fill_blank, matching, listening, reading, speaking
+- **7 interactive exercise types** — choose_correct, fill_blank, matching, listening, reading, word_order, written_answer
 - **Multi-page reading** — original book pages, fullscreen/zoom viewer, and questions below the passage
 - **Admin asset library** — select local Practice Book pages and unit audio without copying URLs
 - **Multiple-choice quizzes** with automatic scoring
@@ -64,6 +64,29 @@ lrnen/
 Open **Admin → Guruhlar**, create a group, select its students, then choose the current lesson in each level tab and save. For example, one A1 group can have access through lesson 10 while another has access through lesson 15. Each new group's default limit is the first lesson of each level. Group limits replace the global release limit for members; students without a group keep the global limit. Students still need to pass the previous lesson's test with at least 60%.
 
 Students retain their individual assigned levels and all progress when transferred between groups. Deleting a group unassigns its students without deleting their accounts or results. Group membership can also be selected when creating a student or changed on the student's detail page.
+
+### Reviewed Level 1 and Level 2 book content
+
+Reviewed offline manifests live in `courses/data/book_enrichment_v2/`. They target existing lesson IDs and retain the original book, unit, activity, page, and answer-key references. A second copy of the Level 2 Course PDF is not a second curriculum. No extraction or translation API is used.
+
+On the workstation holding the original PDFs/audio ZIPs, prepare protected assets:
+
+```bash
+python manage.py prepare_book_assets
+```
+
+Deploy the generated `static/audio/books/` and `static/coursebooks/level*/course/` / `practice/` directories without exposing raw static URLs. Course/Practice audio uses separate level namespaces because identical track names can contain different recordings. The admin audio picker filters by level, book, and original unit.
+
+After backing up the production database and applying migrations:
+
+```bash
+python manage.py import_book_enrichment --dry-run
+python manage.py import_book_enrichment
+```
+
+The importer is transactional and additive. Stable source keys make reruns idempotent; existing lessons, exercises, tests, attempts, groups, and progress remain intact. Existing substantive theory is preserved. Missing assets, incomplete bilingual fields, invalid answer structures, unreviewed manifests, or failed correct-answer grading abort the entire import. `--skip-asset-check` is permitted only for a staging dry run.
+
+Listening/reading rows can use `correct_indices: [0, 2]` for multiple correct answers. All answers must match; partial or extra selections are incorrect. `example_count: 0` makes every structured row scorable when the worked example is already visible on the attached source page.
 
 ---
 
